@@ -1,26 +1,29 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
+import os
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
-WIRING_RULES = {
-    "Bedroom": ["Fan", "Light", "Light", "Socket", "Socket"],
-    "Kitchen": ["Light", "Socket", "Socket", "Socket"],
-    "Hall": ["Fan", "Light", "Light", "Light", "Socket"]
-}
+TEMPLATE_DIR = os.path.join(PROJECT_ROOT, "templates")
+STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 
-@app.route("/generate", methods=["POST"])
-def generate_wiring():
+print("✅ TEMPLATE_DIR:", TEMPLATE_DIR, os.path.exists(TEMPLATE_DIR))
+print("✅ STATIC_DIR  :", STATIC_DIR, os.path.exists(STATIC_DIR))
+
+app = Flask(
+    __name__,
+    template_folder=TEMPLATE_DIR,
+    static_folder=STATIC_DIR
+)
+
+@app.route("/")
+def home():
+    return render_template("canvas.html")
+
+@app.route("/save-plan", methods=["POST"])
+def save_plan():
     data = request.json
-    return jsonify({
-        "room": data.get("room_name"),
-        "type": data.get("room_type"),
-        "dimensions": {
-            "length": data.get("length"),
-            "width": data.get("width")
-        },
-        "points": WIRING_RULES.get(data.get("room_type"), [])
-    })
+    return jsonify({"status": "saved", "objects": len(data)})
 
 if __name__ == "__main__":
-    print("Starting ElectraPlan Flask server...")
     app.run(debug=True)

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ElectraPlan</title>
+</head>
+<body>
+  <h2>ElectraPlan – Wiring Planner</h2>
+
+  <input id="roomName" placeholder="Room Name"><br><br>
+
+  <select id="roomType">
+    <option>Bedroom</option>
+    <option>Kitchen</option>
+    <option>Hall</option>
+  </select><br><br>
+
+  <input id="length" placeholder="Length"><br><br>
+  <input id="width" placeholder="Width"><br><br>
+
+  <button onclick="generate()">Generate</button>
+
+  <pre id="output"></pre>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

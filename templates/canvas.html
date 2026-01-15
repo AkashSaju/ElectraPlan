@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Electra Plan</title>
+
+  <!-- CSS from static folder -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<header class="top-bar glass">
+  <div class="brand">
+    <span class="logo"></span>
+    <span class="title">Electra Plan</span>
+  </div>
+
+  <div class="actions">
+    <button class="primary" onclick="savePlan()">Save</button>
+    <button class="secondary">Export</button>
+  </div>
+</header>
+
+<div class="app-container">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel left-panel">
+  <h4>Architecture</h4>
+
+  <button class="tool-btn" onclick="setTool('select')">Select / Move</button>
+  <button class="tool-btn" onclick="setTool('wall')">Wall Tool</button>
+  <button class="tool-btn" onclick="setTool('room')">Room Tool</button>
+  <button class="tool-btn" onclick="setTool('door')">Door Tool</button>
+  <button class="tool-btn" onclick="setTool('window')">Window Tool</button>
+
+  <hr class="divider">
+
+  <label class="label">Room Name</label>
+  <select id="roomName" class="input">
+    <option value="Living">Living</option>
+    <option value="Bedroom 1">Bedroom 1</option>
+    <option value="Bedroom 2">Bedroom 2</option>
+    <option value="Kitchen">Kitchen</option>
+    <option value="Bath">Bath</option>
+    <option value="Balcony">Balcony</option>
+    <option value="Custom">Custom</option>
+  </select>
+
+  <hr class="divider">
+
+  <button class="tool-btn danger" onclick="deleteSelected()">Delete Selected</button>
+  <button class="tool-btn" onclick="clearAll()">Clear All</button>
+
+  <div class="hint">
+    <p><b>Scale</b>: 1 block = 1 meter</p>
+    <p><b>Wall</b>: Click → Move → Click</p>
+    <p><b>Room</b>: Click → Drag → Release</p>
+    <p><b>Door/Window</b>: Click on a wall</p>
+  </div>
+</aside>
+
+
+  <!-- ✅ CENTER CANVAS (IMPORTANT) -->
+  <main class="canvas-container">
+    <canvas id="designCanvas"></canvas>
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="panel right-panel">
+    <h4>Electrical</h4>
+
+    <div class="asset" draggable="true" data-type="outlet">
+      <span class="icon">⏚</span> Outlet
+    </div>
+
+    <div class="asset" draggable="true" data-type="switch">
+      <span class="icon">⎋</span> Switch
+    </div>
+
+    <div class="asset" draggable="true" data-type="light">
+      <span class="icon">◉</span> Light
+    </div>
+
+    <div class="asset" draggable="true" data-type="breaker">
+      <span class="icon">⧈</span> Breaker
+    </div>
+  </aside>
+
+</div>
+
+<!-- ✅ JS from static folder -->
+<script src="{{ url_for('static', filename='canvas.js') }}"></script>
+
+</body>
+</html>
