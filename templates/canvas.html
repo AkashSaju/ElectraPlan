@@ -17,6 +17,11 @@
   </div>
 
   <div class="actions">
+    <input type="file" id="planFile" accept="image/png,image/jpeg" hidden>
+
+<button class="secondary" onclick="triggerImport()">Import Plan</button>
+<button class="secondary" onclick="detectWalls()">Detect Walls</button>
+
     <button class="primary" onclick="savePlan()">Save</button>
     <button class="secondary">Export</button>
   </div>
