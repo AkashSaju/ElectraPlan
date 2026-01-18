@@ -9,6 +9,9 @@ let viewOffsetY = 0;
 let isPanning = false;
 let panStart = { x: 0, y: 0 };
 let spaceDown = false;
+const PLAN_ID = window.PLAN_ID;
+const WINDOW_HEIGHT_PX = 12; // thickness visual only
+
 
 /* ---------------- SCALE SETTINGS ----------------
    Requirement: 1 grid block = 1 meter
@@ -237,22 +240,51 @@ function drawWindow(win, selected = false) {
   ctx.shadowColor = selected ? "#A3E635" : "#22D3EE";
   ctx.shadowBlur = selected ? 14 : 8;
 
+  const half = (win.width || WINDOW_WIDTH_PX) / 2;
+
+  let x1, y1, x2, y2;
+
+  if (win.dir === "V") {
+    // vertical window
+    x1 = win.x;
+    y1 = win.y - half;
+    x2 = win.x;
+    y2 = win.y + half;
+  } else {
+    // horizontal window
+    x1 = win.x - half;
+    y1 = win.y;
+    x2 = win.x + half;
+    y2 = win.y;
+  }
+
+  // Outer window line
   ctx.beginPath();
-  ctx.moveTo(win.x1, win.y1);
-  ctx.lineTo(win.x2, win.y2);
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
   ctx.stroke();
 
-  // inner window line
+  // Inner window line
   ctx.shadowBlur = 0;
   ctx.strokeStyle = "#E5E7EB";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(win.x1, win.y1);
-  ctx.lineTo(win.x2, win.y2);
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
   ctx.stroke();
+
+  // ✅ Measurement label
+  const meters = pixelsToMeters(win.width || WINDOW_WIDTH_PX);
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2;
+
+  ctx.fillStyle = "rgba(229,231,235,0.9)";
+  ctx.font = "12px Segoe UI";
+  ctx.fillText(`${meters.toFixed(2)}m`, midX + 8, midY - 8);
 
   ctx.restore();
 }
+
 
 /* ---------------- REDRAW ---------------- */
 function redraw() {
@@ -344,9 +376,25 @@ function findObject(px, py) {
     }
 
     if (obj.type === "window") {
-      const d = distPointToLine(px, py, obj.x1, obj.y1, obj.x2, obj.y2);
-      if (d < 10) return obj;
-    }
+  const half = (obj.width || WINDOW_WIDTH_PX) / 2;
+
+  let x1, y1, x2, y2;
+  if (obj.dir === "V") {
+    x1 = obj.x;
+    y1 = obj.y - half;
+    x2 = obj.x;
+    y2 = obj.y + half;
+  } else {
+    x1 = obj.x - half;
+    y1 = obj.y;
+    x2 = obj.x + half;
+    y2 = obj.y;
+  }
+
+  const d = distPointToLine(px, py, x1, y1, x2, y2);
+  if (d < 10) return obj;
+}
+
   }
   return null;
 }
@@ -388,9 +436,10 @@ canvas.addEventListener("mousemove", (e) => {
     }
 
     if (selectedObject.type === "window") {
-      selectedObject.x1 += dx; selectedObject.y1 += dy;
-      selectedObject.x2 += dx; selectedObject.y2 += dy;
-    }
+  selectedObject.x += dx;
+  selectedObject.y += dy;
+}
+
 
     dragStart = { x: hoverPoint.x, y: hoverPoint.y };
     redraw();
@@ -490,19 +539,34 @@ canvas.addEventListener("click", (e) => {
     return;
   }
 
-  // WINDOW PLACE ANYWHERE
-  if (tool === "window") {
-    canvasObjects.push({
-      id: Date.now(),
-      type: "window",
-      x1: pos.x - WINDOW_WIDTH_PX / 2,
-      y1: pos.y,
-      x2: pos.x + WINDOW_WIDTH_PX / 2,
-      y2: pos.y
-    });
-    redraw();
-    return;
+ if (tool === "window") {
+
+  // ✅ Detect nearest wall direction (if wall exists)
+  const wall = nearestWall(pos.x, pos.y);
+
+  // Default direction = horizontal
+  let dir = "H";
+
+  if (wall) {
+    const isHorizontal = Math.abs(wall.y2 - wall.y1) < Math.abs(wall.x2 - wall.x1);
+    dir = isHorizontal ? "H" : "V";
   }
+
+  // ✅ Single window object with rotation direction
+  const win = {
+    id: Date.now(),
+    type: "window",
+    x: pos.x,
+    y: pos.y,
+    dir: dir,          // "H" or "V"
+    width: WINDOW_WIDTH_PX
+  };
+
+  canvasObjects.push(win);
+  redraw();
+  return;
+}
+
 });
 
 /* ---------------- KEYBOARD ---------------- */
@@ -523,6 +587,11 @@ window.addEventListener("keydown", (e) => {
     canvas.style.cursor = "grab";
     e.preventDefault();
   }
+  if (e.key.toLowerCase() === "r" && selectedObject && selectedObject.type === "window") {
+  selectedObject.dir = selectedObject.dir === "H" ? "V" : "H";
+  redraw();
+}
+
 });
 
 window.addEventListener("keyup", (e) => {
@@ -554,7 +623,7 @@ function clearAll() {
 }
 
 function savePlan() {
-  fetch("/save-plan", {
+  fetch(`/save-plan/${PLAN_ID}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(canvasObjects)
@@ -626,4 +695,19 @@ async function detectWalls() {
   redraw();
 }
 
-redraw();
+async function loadPlan() {
+  const res = await fetch(`/load-plan/${PLAN_ID}`);
+  const data = await res.json();
+
+  if (data.error) {
+    alert("Failed to load plan ❌");
+    return;
+  }
+
+  canvasObjects = data.canvasObjects || [];
+  redraw();
+}
+
+
+loadPlan();
+

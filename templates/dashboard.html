@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Electra Plan - Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <header class="top-bar">
+    <div class="brand">
+      <span class="logo"></span>
+      <span class="title">Electra Plan</span>
+    </div>
+    <div class="actions"></div>
+  </header>
+
+  <div style="padding: 22px;">
+    <h2 style="margin-bottom: 10px;">Your Plans</h2>
+
+    <form method="POST" action="/new-plan" style="display:flex; gap:10px; margin-bottom: 18px;">
+      <input class="input" name="name" placeholder="Enter plan name (ex: 2BHK Home)" required>
+      <button class="primary" type="submit">Create New Plan</button>
+    </form>
+
+    <div style="display:grid; gap:12px;">
+      {% for plan in plans %}
+        <div style="padding:14px; border:1px solid rgba(255,255,255,0.12); border-radius:12px; background: rgba(255,255,255,0.03);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-weight:600;">{{ plan.name }}</div>
+              <div style="font-size:12px; color: var(--text-muted);">Plan ID: {{ plan.id }}</div>
+            </div>
+
+            <a href="/editor/{{ plan.id }}" style="text-decoration:none;">
+              <button class="secondary">Open</button>
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+
+      {% if plans|length == 0 %}
+        <div style="color: var(--text-muted); padding: 12px;">
+          No plans yet. Create your first plan above.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

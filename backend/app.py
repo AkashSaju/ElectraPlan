@@ -1,5 +1,7 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 import os
+import sqlite3
+import json
 import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
@@ -10,42 +12,116 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 TEMPLATE_DIR = os.path.join(PROJECT_ROOT, "templates")
 STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 
-UPLOAD_DIR = os.path.join(PROJECT_ROOT, "data", "uploads")
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+DB_PATH = os.path.join(DATA_DIR, "plans.db")
+
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
 
 
-# ---------------- Helpers (Outside Route) ----------------
-def snap(val, step=10):
-    return int(round(val / step) * step)
+# ---------------- DB Helpers ----------------
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def normalize_line(x1, y1, x2, y2):
-    # Keep a consistent ordering
-    if (x1, y1) > (x2, y2):
-        x1, y1, x2, y2 = x2, y2, x1, y1
-    return x1, y1, x2, y2
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            canvas_json TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 
-def line_length(x1, y1, x2, y2):
-    return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+init_db()
 
 
-def is_similar(l1, l2, tol=15):
-    return (
-        abs(l1[0] - l2[0]) < tol and abs(l1[1] - l2[1]) < tol and
-        abs(l1[2] - l2[2]) < tol and abs(l1[3] - l2[3]) < tol
-    )
-
-
-# ---------------- Routes ----------------
+# ---------------- ROUTES ----------------
 @app.route("/")
-def home():
-    return render_template("canvas.html")
+def dashboard():
+    conn = get_db()
+    plans = conn.execute("SELECT * FROM plans ORDER BY updated_at DESC").fetchall()
+    conn.close()
+    return render_template("dashboard.html", plans=plans)
 
 
+@app.route("/new-plan", methods=["POST"])
+def new_plan():
+    name = request.form.get("name", "Untitled Plan")
+
+    empty_state = []  # start with empty canvasObjects
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO plans (name, canvas_json) VALUES (?, ?)",
+        (name, json.dumps(empty_state))
+    )
+    conn.commit()
+    plan_id = cur.lastrowid
+    conn.close()
+
+    return redirect(url_for("editor", plan_id=plan_id))
+
+
+@app.route("/editor/<int:plan_id>")
+def editor(plan_id):
+    conn = get_db()
+    plan = conn.execute("SELECT * FROM plans WHERE id=?", (plan_id,)).fetchone()
+    conn.close()
+
+    if not plan:
+        return "Plan not found", 404
+
+    return render_template("canvas.html", plan_id=plan["id"], plan_name=plan["name"])
+
+
+@app.route("/load-plan/<int:plan_id>")
+def load_plan(plan_id):
+    conn = get_db()
+    plan = conn.execute("SELECT * FROM plans WHERE id=?", (plan_id,)).fetchone()
+    conn.close()
+
+    if not plan:
+        return jsonify({"error": "plan not found"}), 404
+
+    return jsonify({
+        "id": plan["id"],
+        "name": plan["name"],
+        "canvasObjects": json.loads(plan["canvas_json"])
+    })
+
+
+@app.route("/save-plan/<int:plan_id>", methods=["POST"])
+def save_plan(plan_id):
+    data = request.json
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE plans
+        SET canvas_json=?, updated_at=CURRENT_TIMESTAMP
+        WHERE id=?
+    """, (json.dumps(data), plan_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "saved", "plan_id": plan_id, "objects": len(data)})
+
+
+# ---------------- Image Upload (for detection) ----------------
 @app.route("/upload-plan", methods=["POST"])
 def upload_plan():
     if "file" not in request.files:
@@ -59,11 +135,25 @@ def upload_plan():
     save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(save_path)
 
-    return jsonify({
-        "status": "uploaded",
-        "filename": filename
-    })
+    return jsonify({"status": "uploaded", "filename": filename})
 
+@app.route("/electrical-templates/<int:plan_id>")
+def electrical_templates(plan_id):
+    conn = get_db()
+    plan = conn.execute("SELECT * FROM plans WHERE id=?", (plan_id,)).fetchone()
+    conn.close()
+
+    if not plan:
+        return "Plan not found", 404
+
+    return render_template(
+        "electrical_templates.html",
+        plan_id=plan["id"],
+        plan_name=plan["name"]
+    )
+
+
+# ---------------- Detection (basic stable version) ----------------
 @app.route("/detect-walls", methods=["POST"])
 def detect_walls():
     data = request.json
@@ -73,157 +163,65 @@ def detect_walls():
         return jsonify({"error": "filename missing"}), 400
 
     img_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    if not os.path.exists(img_path):
-        return jsonify({"error": "file not found"}), 404
-
     img = cv2.imread(img_path)
+
     if img is None:
         return jsonify({"error": "unable to read image"}), 400
 
-    # ✅ Resize (faster + more stable)
-    scale = 1.0
-    h, w = img.shape[:2]
-    if w > 1200:
-        scale = 1200 / w
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
+    # resize
+    scale = 1200 / img.shape[1] if img.shape[1] > 1200 else 1.0
+    if scale != 1.0:
+        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.bilateralFilter(gray, 7, 60, 60)
 
-    # ✅ Better denoise for mobile photos
-    gray = cv2.bilateralFilter(gray, 9, 75, 75)
+    edges = cv2.Canny(gray, 40, 140, apertureSize=3)
 
-    # ✅ Strong threshold for sketch lines
-    thresh = cv2.adaptiveThreshold(
-        gray, 255,
-        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY_INV,
-        21, 7
-    )
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    processed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+    processed_edges = cv2.dilate(processed_edges, kernel, iterations=1)
 
-    kernel = np.ones((3, 3), np.uint8)
-
-    # ✅ Close gaps (wall continuity)
-    closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
-
-    # ✅ Thicken walls
-    dilated = cv2.dilate(closed, kernel, iterations=2)
-
-    # ✅ Hough lines tuned for long walls
     lines = cv2.HoughLinesP(
-        dilated,
+        processed_edges,
         rho=1,
         theta=np.pi / 180,
-        threshold=140,
-        minLineLength=120,
+        threshold=90,
+        minLineLength=80,
         maxLineGap=25
     )
 
-    def snap(val, step=12):
-        return int(round(val / step) * step)
-
-    def normalize_line(x1, y1, x2, y2):
-        if (x1, y1) > (x2, y2):
-            x1, y1, x2, y2 = x2, y2, x1, y1
-        return x1, y1, x2, y2
-
-    def length(x1, y1, x2, y2):
-        return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-
-    # ✅ Keep only horizontal/vertical lines (engineering plans)
-    def hv_only(x1, y1, x2, y2, tol=10):
-        if abs(y2 - y1) <= tol:  # horizontal
-            return x1, y1, x2, y1
-        if abs(x2 - x1) <= tol:  # vertical
-            return x1, y1, x1, y2
-        return None
-
-    raw = []
+    walls = []
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
 
-            hv = hv_only(x1, y1, x2, y2)
-            if hv is None:
-                continue
+            # scale back
+            x1 = int(x1 / scale)
+            y1 = int(y1 / scale)
+            x2 = int(x2 / scale)
+            y2 = int(y2 / scale)
 
-            x1, y1, x2, y2 = hv
+            walls.append({"type": "wall", "x1": x1, "y1": y1, "x2": x2, "y2": y2})
 
-            # snap endpoints to reduce duplicates
-            x1, y1, x2, y2 = snap(x1), snap(y1), snap(x2), snap(y2)
-
-            if length(x1, y1, x2, y2) < 80:
-                continue
-
-            x1, y1, x2, y2 = normalize_line(x1, y1, x2, y2)
-            raw.append([x1, y1, x2, y2])
-
-    # ✅ Merge collinear segments (simple merge)
-    raw.sort(key=lambda l: (l[1], l[0], l[3], l[2]))
-
-    merged = []
-    for l in raw:
-        if not merged:
-            merged.append(l)
-            continue
-
-        last = merged[-1]
-
-        # horizontal merge
-        if l[1] == l[3] and last[1] == last[3] and l[1] == last[1]:
-            if abs(l[0] - last[2]) <= 25:  # close gap
-                last[2] = max(last[2], l[2])
-                continue
-
-        # vertical merge
-        if l[0] == l[2] and last[0] == last[2] and l[0] == last[0]:
-            if abs(l[1] - last[3]) <= 25:
-                last[3] = max(last[3], l[3])
-                continue
-
-        merged.append(l)
-
-    # ✅ Remove duplicates again
-    unique = []
-    for l in merged:
-        dupe = False
-        for u in unique:
-            if abs(l[0] - u[0]) < 15 and abs(l[1] - u[1]) < 15 and abs(l[2] - u[2]) < 15 and abs(l[3] - u[3]) < 15:
-                dupe = True
-                break
-        if not dupe:
-            unique.append(l)
-
-    # Convert back to original scale
-    if scale != 1.0:
-        for l in unique:
-            l[0] = int(l[0] / scale)
-            l[1] = int(l[1] / scale)
-            l[2] = int(l[2] / scale)
-            l[3] = int(l[3] / scale)
-
-    walls = []
-    for x1, y1, x2, y2 in unique:
-        walls.append({
-            "type": "wall",
-            "x1": int(x1),
-            "y1": int(y1),
-            "x2": int(x2),
-            "y2": int(y2)
-        })
-
-    return jsonify({
-        "status": "ok",
-        "walls": walls,
-        "count": len(walls)
-    })
-
-
-
-@app.route("/save-plan", methods=["POST"])
-def save_plan():
-    data = request.json
-    return jsonify({"status": "saved", "objects": len(data)})
+    return jsonify({"status": "ok", "walls": walls, "count": len(walls)})
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+DB_PATH = os.path.join(DATA_DIR, "plans.db")
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            canvas_json TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+    conn.close()
