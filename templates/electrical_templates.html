@@ -35,6 +35,13 @@
         <div style="color: var(--text-muted); font-size: 12px;">
           Preview updates instantly based on template selection.
         </div>
+        <div id="electricalLegend">
+  <div><span class="sym light"></span> Light</div>
+  <div><span class="sym switch"></span> Switch</div>
+  <div><span class="sym socket"></span> Socket</div>
+  <div><span class="sym exhaust"></span> Exhaust</div>
+</div>
+
       </div>
 
       <div id="templateBadge"
@@ -109,7 +116,9 @@
   window.PLAN_ID = parseInt("{{ plan_id }}", 10);
 </script>
 
-<script src="{{ url_for('static', filename='electrical_templates.js') }}"></script>
+<script src="/static/room_topology_engine.js"></script>
+<script src="/static/electrical_templates.js"></script>
+
 
 <style>
   .template-card{
