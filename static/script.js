@@ -35,6 +35,10 @@ svg.addEventListener("mousedown", e => {
       y: y - parseFloat(selectedWall.getAttribute("y1"))
     };
   }
+  // Add these to your tool selection logic
+if (tool === "counter" || tool === "sink") {
+    startPoint = { x, y };
+}
 });
 
 svg.addEventListener("mousemove", e => {
@@ -85,6 +89,24 @@ svg.addEventListener("mouseup", e => {
     startPoint = null;
   }
 
+  if ((tool === "counter" || tool === "sink") && startPoint) {
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    const width = Math.abs(x - startPoint.x);
+    const height = Math.abs(y - startPoint.y);
+    
+    rect.setAttribute("x", Math.min(x, startPoint.x));
+    rect.setAttribute("y", Math.min(y, startPoint.y));
+    rect.setAttribute("width", width);
+    rect.setAttribute("height", height);
+    rect.setAttribute("fill", tool === "sink" ? "rgba(0,0,255,0.2)" : "rgba(100,100,100,0.2)");
+    rect.setAttribute("stroke", tool === "sink" ? "blue" : "gray");
+    rect.setAttribute("data-type", tool); // Store the type here
+
+    svg.appendChild(rect);
+    walls.push(rect); // Adding to same array for simple saving
+    startPoint = null;
+}
+
   dragOffset = null;
 });
 
@@ -112,14 +134,33 @@ document.getElementById("svgUpload").addEventListener("change", e => {
 });
 
 /* ---------- Next Page ---------- */
-function nextPage() {
+async function nextPage() {
+  // 1. Map SVG lines to the JSON format ElectraPlan expects
   const model = walls.map(w => ({
-    x1: w.getAttribute("x1"),
-    y1: w.getAttribute("y1"),
-    x2: w.getAttribute("x2"),
-    y2: w.getAttribute("y2")
+    id: Date.now() + Math.random(),
+    type: "wall",
+    x1: parseFloat(w.getAttribute("x1")),
+    y1: parseFloat(w.getAttribute("y1")),
+    x2: parseFloat(w.getAttribute("x2")),
+    y2: parseFloat(w.getAttribute("y2"))
   }));
 
-  localStorage.setItem("floorPlan", JSON.stringify(model));
-  alert("Floor plan saved. Next page: templates.");
+  // 2. Send to Flask Database instead of localStorage
+  // Make sure window.PLAN_ID is defined in your HTML
+  try {
+    const response = await fetch(`/save-plan/${window.PLAN_ID}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(model)
+    });
+
+    if (response.ok) {
+      alert("Floor plan saved to database! ✅");
+      window.location.href = `/electrical-templates/${window.PLAN_ID}`;
+    } else {
+      alert("Failed to save to server. ❌");
+    }
+  } catch (err) {
+    console.error("Save Error:", err);
+  }
 }

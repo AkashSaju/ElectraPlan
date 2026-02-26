@@ -6,6 +6,7 @@ const pctx = previewCanvas.getContext("2d");
 let planObjects = [];
 let selectedTemplate = "cost";
 
+
 // resize preview canvas to match CSS size
 function resizePreviewCanvas() {
   previewCanvas.width = previewCanvas.clientWidth;
@@ -131,7 +132,6 @@ function generateElectrical(objects, mode) {
   });
 
   for (const t of topology) {
-
     const r = t.room;
     const label = (r.label || "").toLowerCase();
 
@@ -143,107 +143,288 @@ function generateElectrical(objects, mode) {
 
     // ================= CUSTOM =================
     if (mode === "custom") {
-
-      // only base electrical
       if (mainWall) {
         const light = wallMid(mainWall);
         add("elec_light", light.x, light.y);
       }
-
       if (entryWall) {
         const sw = wallMid(entryWall);
         add("elec_switch", sw.x, sw.y);
       }
-
-      // appliances will be placed manually
-      continue;
+      continue; 
     }
 
-    // ================= COST =================
-    if (mode === "cost") {
+    // ================= COST-EFFECTIVE =================
+   // ================= COST-EFFECTIVE =================
+   if (mode === "cost") {
+    // 1. CEILING FAN (Always Central)
+    add("elec_fan", center.x, center.y, "Fan");
 
-      // wall light
-      if (mainWall) {
-        const light = wallMid(mainWall);
-        add("elec_light", light.x, light.y);
-      }
+    if (label.includes("kitchen")) {
+        const rCenter = roomCenterPoint(r);
+        
+        // --- 2. THE "CLEAN" WALL (Opposite the Counter) ---
+        // We use t.longestWall as the base for the opposite calculation
+        let counterWall = null;
+        if (t.counters && t.counters.length > 0) {
+            const cMid = { x: (t.counters[0].x1 + t.counters[0].x2)/2, y: (t.counters[0].y1 + t.counters[0].y2)/2 };
+            counterWall = nearestWall(cMid.x, cMid.y, t.walls);
+        }
 
-      // fan center
-      add("elec_fan", center.x, center.y);
+        // Find the wall opposite the counter
+        let oppWall = t.longestWall; 
+        if (counterWall) {
+            const cMid = wallMid(counterWall);
+            oppWall = t.walls.reduce((prev, curr) => {
+                const d1 = Math.hypot(wallMid(prev).x - cMid.x, wallMid(prev).y - cMid.y);
+                const d2 = Math.hypot(wallMid(curr).x - cMid.x, wallMid(curr).y - cMid.y);
+                return (d2 > d1) ? curr : prev;
+            });
+        }
+if (oppWall) {
+    const mid = wallMid(oppWall);
+    const rCenter = roomCenterPoint(r);
+    
+    // 1. Orientation & Inward Push
+    const isH = Math.abs(oppWall.x2 - oppWall.x1) > Math.abs(oppWall.y2 - oppWall.y1);
+    const pushX = rCenter.x > mid.x ? 15 : -15;
+    const pushY = rCenter.y > mid.y ? 15 : -15;
 
-      // switch
-      if (entryWall) {
-        const sw = wallMid(entryWall);
-        add("elec_switch", sw.x, sw.y);
-      }
+    // 2. Identify wall boundaries and length
+    const xMin = Math.min(oppWall.x1, oppWall.x2);
+    const yMin = Math.min(oppWall.y1, oppWall.y2);
+    const len = wallLength(oppWall);
 
-      // minimal sockets
-      if (label.includes("living") && mainWall) {
-        const tv = wallMid(mainWall);
-        add("elec_socket", tv.x, tv.y, "TV");
-      }
+    // 3. Spacing Percentages (Matches Standard logic)
+    const lightPos = 0.25;  // 25% along the wall
+    const fridgePos = 0.60; // 60% along the wall
+    const switchPos = 0.85; // 85% along the wall (At the far end)
 
-      if (label.includes("kitchen") && bottomWall) {
-        const fridge = wallMid(bottomWall);
-        add("elec_socket", fridge.x, fridge.y, "Fridge");
-      }
+    if (isH) {
+        // --- HORIZONTAL WALL ---
+        add("elec_light", xMin + (len * lightPos), yMin + pushY, "Main Light");
+        add("elec_socket", xMin + (len * fridgePos), yMin + pushY, "Fridge");
+        add("elec_switch", xMin + (len * switchPos), yMin + pushY, "Main Switch");
+    } else {
+        // --- VERTICAL WALL ---
+        add("elec_light", xMin + pushX, yMin + (len * lightPos), "Main Light");
+        add("elec_socket", xMin + pushX, yMin + (len * fridgePos), "Fridge");
+        add("elec_switch", xMin + pushX, yMin + (len * switchPos), "Main Switch");
+    }
+}
+        // --- 3. THE "WORK" ZONE (Sides of Sink) ---
+       // --- 3. THE "WORK" ZONE (One set on the Main Counter) ---
+if (t.counters && t.counters.length > 0) {
+    const mc = t.counters[0]; // Take only the first (main) counter
+    const rCenter = roomCenterPoint(r);
+    
+    // Find boundaries
+    const xMin = Math.min(mc.x1, mc.x2);
+    const xMax = Math.max(mc.x1, mc.x2);
+    const yMin = Math.min(mc.y1, mc.y2);
+    const yMax = Math.max(mc.y1, mc.y2);
+    const len = wallLength(mc);
+    
+    // Orientation & Inward Push
+    const isH = Math.abs(mc.x2 - mc.x1) > Math.abs(mc.y2 - mc.y1);
+    const pushX = rCenter.x > (xMin + xMax) / 2 ? 12 : -12;
+    const pushY = rCenter.y > (yMin + yMax) / 2 ? 12 : -12;
 
-      if (label.includes("bath") && topWall) {
-        const ex = wallMid(topWall);
-        add("elec_exhaust", ex.x, ex.y);
-      }
+    if (isH) {
+        // --- HORIZONTAL COUNTER ---
+        // Mixi at one end (30px margin)
+        add("elec_socket", xMin + 30, yMin + pushY, "Mixi");
+        // General Socket at the other end (30px margin)
+        add("elec_socket", xMax - 30, yMin + pushY, "General Socket");
+    } else {
+        // --- VERTICAL COUNTER ---
+        // Mixi at the top end
+        add("elec_socket", xMin + pushX, yMin + 30, "Mixi");
+        // General Socket at the bottom end
+        add("elec_socket", xMax + pushX, yMax - 30, "General Socket");
+    }
+}
+    } else {
+        // Simple default for other rooms in Cost mode
+        if (mainWall) add("elec_light", wallMid(mainWall).x, wallMid(mainWall).y, "Main Light");
+        if (entryWall) add("elec_switch", wallMid(entryWall).x, wallMid(entryWall).y, "Switch");
+    }
+}
+
+
+// ================= CUSTOM SECTION =================
+if (mode === "custom") {
+    const rCenter = roomCenterPoint(r);
+    
+    // 1. CUSTOM AMBIENCE: 3-Point Lighting (Professional Look)
+    if (oppositeWall) {
+        const len = wallLength(oppositeWall);
+        const xMin = Math.min(oppositeWall.x1, oppositeWall.x2);
+        const yMin = Math.min(oppositeWall.y1, oppositeWall.y2);
+        const pushX = rCenter.x > xMin ? 15 : -15;
+        const pushY = rCenter.y > yMin ? 15 : -15;
+        const isH = Math.abs(oppositeWall.x2 - oppositeWall.x1) > Math.abs(oppositeWall.y2 - oppositeWall.y1);
+
+        // Place 3 balanced lights for a high-end custom feel
+        [0.2, 0.5, 0.8].forEach((pos, index) => {
+            if (isH) {
+                add("elec_light", xMin + (len * pos), yMin + pushY, `Custom Light ${index + 1}`);
+            } else {
+                add("elec_light", xMin + pushX, yMin + (len * pos), `Custom Light ${index + 1}`);
+            }
+        });
     }
 
-    // ================= STANDARD =================
+    // 2. CUSTOM APPLIANCE HUB: Grouped Power
+    if (label.includes("kitchen")) {
+        // Find the corner where entryWall and oppositeWall meet
+        if (entryWall && oppositeWall) {
+            const cornerX = Math.max(entryWall.x1, entryWall.x2);
+            const cornerY = Math.max(entryWall.y1, entryWall.y2);
+            
+            // Place a Heavy Duty Hub for Fridge + Microwave + Grinder
+            add("elec_socket", cornerX - 40, cornerY - 40, "Appliance Hub (32A)");
+        }
+
+        // 3. ISLAND/CENTER POWER: Only if the room is large enough
+        const roomArea = Math.abs((r.x2 - r.x1) * (r.y2 - r.y1));
+        if (roomArea > 50000) { // Example threshold for a large kitchen
+             add("elec_socket", center.x, center.y, "Island Floor Socket");
+        }
+    }
+
+    // 4. SMART SWITCH: Double Switch for Home Automation
+    if (entryWall) {
+        const mid = wallMid(entryWall);
+        add("elec_switch", mid.x, mid.y, "Smart Panel");
+    }
+}
+    // ================= STANDARD (INTELLIGENT) =================
     if (mode === "standard") {
+      // Basic Lighting & Fan
+      
+     
+    if (label.includes("kitchen")) {
+    const rCenter = roomCenterPoint(t.room);
 
-      // TWO wall lights
-      if (mainWall) {
-        const light1 = wallMid(mainWall);
-        add("elec_light", light1.x, light1.y);
-
-        add("elec_light", light1.x + 60, light1.y);
-      }
-
-      // FAN
-      add("elec_fan", center.x, center.y);
-
-      // SWITCH
-      if (entryWall) {
-        const sw = wallMid(entryWall);
-        add("elec_switch", sw.x, sw.y);
-      }
-
-      // SOCKETS
-      if (label.includes("living") && mainWall) {
-        const tv = wallMid(mainWall);
-        add("elec_socket", tv.x, tv.y, "TV");
-      }
-
-      if (label.includes("bedroom") && mainWall) {
-        const charge = wallMid(mainWall);
-        add("elec_socket", charge.x, charge.y, "Charging");
-      }
-
-      if (label.includes("kitchen")) {
-
-        if (bottomWall) {
-          const fridge = wallMid(bottomWall);
-          add("elec_socket", fridge.x, fridge.y, "Fridge");
-        }
-
-        if (mainWall) {
-          const mixi = wallMid(mainWall);
-          add("elec_socket", mixi.x, mixi.y, "Mixi");
-        }
-      }
-
-      if (label.includes("bath") && topWall) {
-        const ex = wallMid(topWall);
-        add("elec_exhaust", ex.x, ex.y);
-      }
+    // --- 1. LIGHTS & FRIDGE (Attached to the Same Opposite Wall) ---
+    let counterWall = null;
+    if (t.counters.length > 0) {
+        const cMid = { x: (t.counters[0].x1 + t.counters[0].x2)/2, y: (t.counters[0].y1 + t.counters[0].y2)/2 };
+        counterWall = nearestWall(cMid.x, cMid.y, t.walls);
     }
-  }
+
+    let oppositeWall = t.longestWall; 
+    if (counterWall) {
+        const cMid = wallMid(counterWall);
+        oppositeWall = t.walls.reduce((prev, curr) => {
+            const d1 = Math.hypot(wallMid(prev).x - cMid.x, wallMid(prev).y - cMid.y);
+            const d2 = Math.hypot(wallMid(curr).x - cMid.x, wallMid(curr).y - cMid.y);
+            return (d2 > d1) ? curr : prev;
+        });
+    }
+
+   if (oppositeWall) {
+        const mid = wallMid(oppositeWall);
+        const rCenter = roomCenterPoint(t.room);
+        const isH = Math.abs(oppositeWall.x2 - oppositeWall.x1) > Math.abs(oppositeWall.y2 - oppositeWall.y1);
+        
+        const pushX = rCenter.x > mid.x ? 15 : -15;
+        const pushY = rCenter.y > mid.y ? 15 : -15;
+
+        const xMin = Math.min(oppositeWall.x1, oppositeWall.x2);
+        const yMin = Math.min(oppositeWall.y1, oppositeWall.y2);
+        const len = wallLength(oppositeWall);
+
+        // Define consistent spacing percentages
+        const lightPos = 0.25;  // 25% along the wall
+        const fridgePos = 0.60; // 60% along the wall
+        const switchPos = 0.80; // 80% along the wall (A bit away from the fridge)
+
+        if (isH) {
+            // --- HORIZONTAL WALL ---
+            add("elec_light", xMin + (len * lightPos), yMin + pushY, "Main Light");
+            add("elec_socket", xMin + (len * fridgePos), yMin + pushY, "Fridge");
+            // Switch is placed at 80% of the wall, keeping it away from the fridge
+            add("elec_switch", xMin + (len * switchPos), yMin + pushY, "Main Switch Board");
+        } else {
+            // --- VERTICAL WALL ---
+            add("elec_light", xMin + pushX, yMin + (len * lightPos), "Main Light");
+            add("elec_socket", xMin + pushX, yMin + (len * fridgePos), "Fridge");
+            // Switch is placed at 80% of the wall height
+            add("elec_switch", xMin + pushX, yMin + (len * switchPos), "Main Switch Board");
+        }
+    }
+
+ // --- 4. MAIN SWITCH BOARD (Placed exactly at the Door) ---
+   // --- 4. MAIN SWITCH BOARD (Placed at the end of the Entry Wall) ---
+
+    // --- 2. MIXI & OVEN (Follows Counter Orientation) ---
+    if (t.counters.length > 0) {
+        const mc = t.counters[0];
+        const mcMid = { x: (mc.x1 + mc.x2)/2, y: (mc.y1 + mc.y2)/2 };
+        const mcIsH = Math.abs(mc.x2 - mc.x1) > Math.abs(mc.y2 - mc.y1);
+        const mcLen = Math.hypot(mc.x2 - mc.x1, mc.y2 - mc.y1);
+        
+        const pushX = rCenter.x > mcMid.x ? 12 : -12;
+        const pushY = rCenter.y > mcMid.y ? 12 : -12;
+
+        if (mcIsH) {
+            // Horizontal Placement
+            add("elec_socket", mc.x1 + (mcLen * 0.2), mc.y1 + pushY, "Mixi");
+            add("elec_socket", mc.x1 + (mcLen * 0.8), mc.y1 + pushY, "Oven");
+        } else {
+            // Vertical Placement
+            add("elec_socket", mc.x1 + pushX, mc.y1 + (mcLen * 0.2), "Mixi");
+            add("elec_socket", mc.x1 + pushX, mc.y1 + (mcLen * 0.8), "Oven");
+        }
+    }
+
+    // --- 3. GENERAL SOCKETS (Any Extra Counters) ---
+    // 3. GENERAL SOCKETS (At the ends of any extra counters)
+    for (let i = 1; i < t.counters.length; i++) {
+        const ec = t.counters[i];
+        
+        // Find boundaries
+        const xMin = Math.min(ec.x1, ec.x2);
+        const xMax = Math.max(ec.x1, ec.x2);
+        const yMin = Math.min(ec.y1, ec.y2);
+        const yMax = Math.max(ec.y1, ec.y2);
+        
+        // Midpoint and Orientation
+        const ecMid = { x: (xMin + xMax) / 2, y: (yMin + yMax) / 2 };
+        const isH = Math.abs(ec.x2 - ec.x1) > Math.abs(ec.y2 - ec.y1);
+        
+        // Push inward toward room center
+        const pushX = rCenter.x > ecMid.x ? 12 : -12;
+        const pushY = rCenter.y > ecMid.y ? 12 : -12;
+
+        if (isH) {
+            // --- HORIZONTAL EXTRA COUNTER ---
+            // Socket at Left End
+            add("elec_socket", xMin + 20, yMin + pushY, "General Socket");
+            // Socket at Right End
+            
+        } else {
+            // --- VERTICAL EXTRA COUNTER ---
+            // Socket at Top End
+            add("elec_socket", xMin + pushX, yMin + 20, "General Socket");
+            // Socket at Bottom End
+            
+        }
+    }
+
+    // --- 4. SINK LIGHT & FAN ---
+    add("elec_fan", center.x, center.y, "Fan");
+    t.sinks.forEach(sink => {
+        add("elec_light", (sink.x1 + sink.x2) / 2, Math.min(sink.y1, sink.y2) + 5, "Sink Light");
+    });
+}
+      
+
+      
+    }
+}
 
   return elec;
 }
@@ -369,10 +550,20 @@ function drawExhaustSymbol(x, y) {
 
 function drawElectrical(points) {
   for (const p of points) {
+    // ... your existing switch/light/exhaust drawing ...
     if (p.type === "elec_light") drawLightSymbol(p.x, p.y);
     if (p.type === "elec_switch") drawSwitchSymbol(p.x, p.y);
     if (p.type === "elec_socket") drawSocketSymbol(p.x, p.y);
     if (p.type === "elec_exhaust") drawExhaustSymbol(p.x, p.y);
+
+    // ✅ ADD LABELS (Understandable Way)
+    if (p.label) {
+      pctx.shadowBlur = 0;
+      pctx.fillStyle = "#E5E7EB";
+      pctx.font = "bold 10px Segoe UI";
+      pctx.textAlign = "center";
+      pctx.fillText(p.label, p.x, p.y - 18); // Place text above symbol
+    }
   }
 }
 

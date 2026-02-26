@@ -30,37 +30,35 @@
   <!-- LEFT: PREVIEW -->
   <section style="border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); position: relative;">
     <div style="display:flex; justify-content:space-between; align-items:center; padding: 14px 14px 0;">
-      <div>
-        <div style="font-weight: 700; font-size: 16px;">Template Preview</div>
-        <div style="color: var(--text-muted); font-size: 12px;">
-          Preview updates instantly based on template selection.
+        <div>
+            <div style="font-weight: 700; font-size: 16px;">Template Preview</div>
+            <div style="color: var(--text-muted); font-size: 12px;">Preview updates instantly based on selection.</div>
         </div>
-        <div id="electricalLegend">
-  <div><span class="sym light"></span> Light</div>
-  <div><span class="sym switch"></span> Switch</div>
-  <div><span class="sym socket"></span> Socket</div>
-  <div><span class="sym exhaust"></span> Exhaust</div>
-</div>
+        <div id="templateBadge" style="padding:6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 12px; color: var(--text-main); background: rgba(59,130,246,0.15);">
+            Cost-Effective
+        </div>
+    </div>
 
-      </div>
-
-      <div id="templateBadge"
-        style="padding:6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12);
-               font-size: 12px; color: var(--text-main); background: rgba(59,130,246,0.15);">
-        Cost-Effective
-      </div>
+    <div id="customToolsPanel" class="controls-panel" style="display: none;">
+        <h3>Kitchen Components</h3>
+        <div class="tool-group">
+            <p>Mandatory</p>
+            <button class="btn" onclick="setActiveTool('elec_fan')">Ceiling Fan</button>
+            <button class="btn" onclick="setActiveTool('elec_switch')">Main Switch Board</button>
+        </div>
+        <div class="tool-group">
+            <p>Appliances</p>
+            <button class="btn" onclick="setActiveTool('elec_socket_fridge')">Fridge Point</button>
+            <button class="btn" onclick="setActiveTool('elec_socket_mixi')">Mixi Point</button>
+            <button class="btn" onclick="setActiveTool('elec_socket_oven')">Oven Point</button>
+        </div>
+        <button class="btn delete-btn" onclick="setActiveTool('delete')">❌ Remove Item</button>
     </div>
 
     <div style="padding: 14px;">
-      <canvas id="previewCanvas"
-        style="width:100%; height: calc(100vh - 160px); display:block; border-radius: 14px; background: #0E1428;">
-      </canvas>
+        <canvas id="previewCanvas" style="width:100%; height: calc(100vh - 160px); display:block; border-radius: 14px; background: #0E1428;"></canvas>
     </div>
-
-    <div style="position:absolute; left: 20px; bottom: 18px; color: var(--text-muted); font-size: 12px;">
-      Tip: Choose a template → preview → apply.
-    </div>
-  </section>
+</section>
 
   <!-- RIGHT: TEMPLATE PICKER -->
   <aside style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); padding: 14px; display:flex; flex-direction:column;">

@@ -14,19 +14,19 @@ const WINDOW_HEIGHT_PX = 12; // thickness visual only
 
 
 /* ---------------- SCALE SETTINGS ----------------
-   Requirement: 1 grid block = 1 meter
+    Requirement: 1 grid block = 1 meter
 */
 let gridSize = 40;               // 40px = 1 meter
 const WALL_THICKNESS_M = 0.15;   // 0.15m wall thickness
 const DOOR_WIDTH_M = 0.9;        // 0.9m door width
-const WINDOW_WIDTH_M = 1.2;      // default window width
+const WINDOW_WIDTH_M = 0.8;      // default window width
 
 const WALL_THICKNESS = WALL_THICKNESS_M * gridSize;   // px
 const DOOR_WIDTH_PX = DOOR_WIDTH_M * gridSize;        // px
 const WINDOW_WIDTH_PX = WINDOW_WIDTH_M * gridSize;    // px
 
 let tool = "wall";
-let canvasObjects = []; // walls, rooms, doors, windows
+let canvasObjects = []; // walls, rooms, doors, windows, counters, sinks
 let selectedObject = null;
 
 let isDrawing = false;
@@ -202,6 +202,42 @@ function drawRoom(r, selected = false, dashed = false) {
   ctx.restore();
 }
 
+/* ---------------- DRAW COUNTER (New) ---------------- */
+function drawCounter(c, selected = false, dashed = false) {
+  const x = Math.min(c.x1, c.x2);
+  const y = Math.min(c.y1, c.y2);
+  const w = Math.abs(c.x2 - c.x1);
+  const h = Math.abs(c.y2 - c.y1);
+
+  ctx.save();
+  if (dashed) ctx.setLineDash([8, 4]);
+  ctx.fillStyle = "rgba(148, 163, 184, 0.2)"; 
+  ctx.fillRect(x, y, w, h);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = selected ? "#A3E635" : "#94A3B8";
+  ctx.strokeRect(x, y, w, h);
+  ctx.restore();
+}
+
+/* ---------------- DRAW SINK (New) ---------------- */
+function drawSink(s, selected = false, dashed = false) {
+  const x = Math.min(s.x1, s.x2);
+  const y = Math.min(s.y1, s.y2);
+  const w = Math.abs(s.x2 - s.x1);
+  const h = Math.abs(s.y2 - s.y1);
+
+  ctx.save();
+  if (dashed) ctx.setLineDash([5, 5]);
+  ctx.fillStyle = "rgba(14, 165, 233, 0.1)";
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = selected ? "#A3E635" : "#0EA5E9";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h); 
+  const inset = 6;
+  ctx.strokeRect(x + inset, y + inset, w - (inset*2), h - (inset*2)); 
+  ctx.restore();
+}
+
 /* ---------------- DOOR (rotation supported) ---------------- */
 function drawDoor(d, selected = false) {
   ctx.save();
@@ -285,6 +321,26 @@ function drawWindow(win, selected = false) {
   ctx.restore();
 }
 
+/* --- NEW: Detect Wall Orientation for Window Snapping --- */
+function getNearestWallDir(px, py) {
+  let threshold = 20; // Max distance to detect a wall
+  let bestDir = "H"; // Default
+  let minD = Infinity;
+
+  canvasObjects.forEach(obj => {
+    if (obj.type === "wall") {
+      const d = distPointToLine(px, py, obj.x1, obj.y1, obj.x2, obj.y2);
+      if (d < threshold && d < minD) {
+        minD = d;
+        // If the wall's Y change is greater than its X change, it's a vertical wall
+        const isVertical = Math.abs(obj.y2 - obj.y1) > Math.abs(obj.x2 - obj.x1);
+        bestDir = isVertical ? "V" : "H";
+      }
+    }
+  });
+  return bestDir;
+}
+
 
 /* ---------------- REDRAW ---------------- */
 function redraw() {
@@ -304,6 +360,8 @@ function redraw() {
     if (obj.type === "room") drawRoom(obj, sel);
     if (obj.type === "door") drawDoor(obj, sel);
     if (obj.type === "window") drawWindow(obj, sel);
+    if (obj.type === "counter") drawCounter(obj, sel);
+    if (obj.type === "sink") drawSink(obj, sel);
   });
 
   // live preview
@@ -314,6 +372,12 @@ function redraw() {
     if (tool === "room") {
       const label = document.getElementById("roomName")?.value || "Room";
       drawRoom({ x1: startPoint.x, y1: startPoint.y, x2: hoverPoint.x, y2: hoverPoint.y, label }, true, true);
+    }
+    if (tool === "counter") {
+      drawCounter({ x1: startPoint.x, y1: startPoint.y, x2: hoverPoint.x, y2: hoverPoint.y }, true, true);
+    }
+    if (tool === "sink") {
+      drawSink({ x1: startPoint.x, y1: startPoint.y, x2: hoverPoint.x, y2: hoverPoint.y }, true, true);
     }
   }
 
@@ -362,7 +426,7 @@ function findObject(px, py) {
   for (let i = canvasObjects.length - 1; i >= 0; i--) {
     const obj = canvasObjects[i];
 
-    if (obj.type === "room") {
+    if (obj.type === "room" || obj.type === "counter" || obj.type === "sink") {
       if (pointInRoom(px, py, obj)) return obj;
     }
 
@@ -376,25 +440,20 @@ function findObject(px, py) {
     }
 
     if (obj.type === "window") {
-  const half = (obj.width || WINDOW_WIDTH_PX) / 2;
+    const half = (obj.width || WINDOW_WIDTH_PX) / 2;
+    let x1, y1, x2, y2;
+    
+    if (obj.dir === "V") {
+        x1 = obj.x; y1 = obj.y - half;
+        x2 = obj.x; y2 = obj.y + half;
+    } else {
+        x1 = obj.x - half; y1 = obj.y;
+        x2 = obj.x + half; y2 = obj.y;
+    }
 
-  let x1, y1, x2, y2;
-  if (obj.dir === "V") {
-    x1 = obj.x;
-    y1 = obj.y - half;
-    x2 = obj.x;
-    y2 = obj.y + half;
-  } else {
-    x1 = obj.x - half;
-    y1 = obj.y;
-    x2 = obj.x + half;
-    y2 = obj.y;
-  }
-
-  const d = distPointToLine(px, py, x1, y1, x2, y2);
-  if (d < 10) return obj;
+    const d = distPointToLine(px, py, x1, y1, x2, y2);
+    if (d < 10) return obj; // Window hit detection
 }
-
   }
   return null;
 }
@@ -403,63 +462,44 @@ function findObject(px, py) {
 canvas.addEventListener("mousemove", (e) => {
   hoverPoint = getMouse(e);
 
-  // ✅ Pan (SPACE + Drag)
   if (isPanning) {
     const dx = hoverPoint.rawX - panStart.x;
     const dy = hoverPoint.rawY - panStart.y;
-
     viewOffsetX += dx;
     viewOffsetY += dy;
-
     panStart = { x: hoverPoint.rawX, y: hoverPoint.rawY };
     redraw();
     return;
   }
 
-  // move selected object
   if (tool === "select" && isDragging && selectedObject && dragStart) {
     const dx = hoverPoint.x - dragStart.x;
     const dy = hoverPoint.y - dragStart.y;
 
-    if (selectedObject.type === "wall") {
+    if (["wall", "room", "counter", "sink"].includes(selectedObject.type)) {
       selectedObject.x1 += dx; selectedObject.y1 += dy;
       selectedObject.x2 += dx; selectedObject.y2 += dy;
     }
 
-    if (selectedObject.type === "room") {
-      selectedObject.x1 += dx; selectedObject.y1 += dy;
-      selectedObject.x2 += dx; selectedObject.y2 += dy;
-    }
-
-    if (selectedObject.type === "door") {
+    if (selectedObject.type === "door" || selectedObject.type === "window") {
       selectedObject.x += dx; selectedObject.y += dy;
     }
-
-    if (selectedObject.type === "window") {
-  selectedObject.x += dx;
-  selectedObject.y += dy;
-}
-
 
     dragStart = { x: hoverPoint.x, y: hoverPoint.y };
     redraw();
     return;
   }
-
   redraw();
 });
 
 canvas.addEventListener("mousedown", (e) => {
   const pos = getMouse(e);
-
-  // ✅ Pan mode start
   if (spaceDown) {
     isPanning = true;
     panStart = { x: pos.rawX, y: pos.rawY };
     canvas.style.cursor = "grabbing";
     return;
   }
-
   if (tool === "select") {
     const hit = findObject(pos.x, pos.y);
     selectedObject = hit;
@@ -479,21 +519,18 @@ canvas.addEventListener("mouseup", () => {
 canvas.addEventListener("click", (e) => {
   const pos = getMouse(e);
 
-  // WALL DRAW
-  if (tool === "wall") {
+  if (["wall", "room", "counter", "sink"].includes(tool)) {
     if (!isDrawing) {
       isDrawing = true;
       startPoint = pos;
     } else {
       canvasObjects.push({
         id: Date.now(),
-        type: "wall",
-        x1: startPoint.x,
-        y1: startPoint.y,
-        x2: pos.x,
-        y2: pos.y
+        type: tool,
+        label: tool === "room" ? (document.getElementById("roomName")?.value || "Room") : null,
+        x1: startPoint.x, y1: startPoint.y,
+        x2: pos.x, y2: pos.y
       });
-
       isDrawing = false;
       startPoint = null;
       redraw();
@@ -501,97 +538,47 @@ canvas.addEventListener("click", (e) => {
     return;
   }
 
-  // ROOM DRAW
-  if (tool === "room") {
-    if (!isDrawing) {
-      isDrawing = true;
-      startPoint = pos;
-    } else {
-      const label = document.getElementById("roomName")?.value || "Room";
-
-      canvasObjects.push({
-        id: Date.now(),
-        type: "room",
-        label: label,
-        x1: startPoint.x,
-        y1: startPoint.y,
-        x2: pos.x,
-        y2: pos.y
-      });
-
-      isDrawing = false;
-      startPoint = null;
-      redraw();
-    }
-    return;
-  }
-
-  // DOOR PLACE ANYWHERE
   if (tool === "door") {
-    canvasObjects.push({
-      id: Date.now(),
-      type: "door",
-      x: pos.x,
-      y: pos.y,
-      rotation: 0
-    });
+    canvasObjects.push({ id: Date.now(), type: "door", x: pos.x, y: pos.y, rotation: 0 });
     redraw();
     return;
   }
 
  if (tool === "window") {
+    // Determine direction based on nearby walls
+    const detectedDir = getNearestWallDir(pos.x, pos.y);
 
-  // ✅ Detect nearest wall direction (if wall exists)
-  const wall = nearestWall(pos.x, pos.y);
-
-  // Default direction = horizontal
-  let dir = "H";
-
-  if (wall) {
-    const isHorizontal = Math.abs(wall.y2 - wall.y1) < Math.abs(wall.x2 - wall.x1);
-    dir = isHorizontal ? "H" : "V";
+    canvasObjects.push({ 
+      id: Date.now(), 
+      type: "window", 
+      x: pos.x, 
+      y: pos.y, 
+      dir: detectedDir, // Use the detected direction here
+      width: WINDOW_WIDTH_PX 
+    });
+    redraw();
+    return;
   }
-
-  // ✅ Single window object with rotation direction
-  const win = {
-    id: Date.now(),
-    type: "window",
-    x: pos.x,
-    y: pos.y,
-    dir: dir,          // "H" or "V"
-    width: WINDOW_WIDTH_PX
-  };
-
-  canvasObjects.push(win);
-  redraw();
-  return;
-}
-
 });
 
 /* ---------------- KEYBOARD ---------------- */
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") cancelDrawing();
   if (e.key === "Delete") deleteSelected();
-
-  // door rotate
-  if (e.key.toLowerCase() === "r" && selectedObject && selectedObject.type === "door") {
-    selectedObject.rotation = (selectedObject.rotation || 0) + 90;
-    if (selectedObject.rotation >= 360) selectedObject.rotation = 0;
+  if (e.key.toLowerCase() === "r" && selectedObject) {
+    if (selectedObject.type === "door") {
+        selectedObject.rotation = (selectedObject.rotation || 0) + 90;
+        if (selectedObject.rotation >= 360) selectedObject.rotation = 0;
+    } else if (selectedObject.type === "window") {
+        selectedObject.dir = selectedObject.dir === "H" ? "V" : "H";
+    }
     redraw();
   }
-
-  // ✅ space for pan
   if (e.code === "Space") {
     spaceDown = true;
     canvas.style.cursor = "grab";
     e.preventDefault();
   }
-  if (e.key.toLowerCase() === "r" && selectedObject && selectedObject.type === "window") {
-  selectedObject.dir = selectedObject.dir === "H" ? "V" : "H";
-  redraw();
-}
-
 });
 
 window.addEventListener("keyup", (e) => {
@@ -627,87 +614,14 @@ function savePlan() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(canvasObjects)
-  })
-    .then(r => r.json())
-    .then(() => alert("Plan Saved ✅"))
-    .catch(() => alert("Save failed ❌"));
-}
-
-/* ---------------- IMPORT + DETECT ---------------- */
-function triggerImport() {
-  document.getElementById("planFile").click();
-}
-
-document.getElementById("planFile")?.addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const formData = new FormData();
-  formData.append("file", file);
-
-  const res = await fetch("/upload-plan", {
-    method: "POST",
-    body: formData
-  });
-
-  const data = await res.json();
-
-  if (data.error) {
-    alert("Upload failed: " + data.error);
-    return;
-  }
-
-  importedFilename = data.filename;
-  alert("Plan imported ✅ Now click Detect Walls");
-});
-
-async function detectWalls() {
-  if (!importedFilename) {
-    alert("Please import a plan image first.");
-    return;
-  }
-
-  const res = await fetch("/detect-walls", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename: importedFilename })
-  });
-
-  const data = await res.json();
-
-  if (data.error) {
-    alert("Detection failed: " + data.error);
-    return;
-  }
-
-  const walls = data.walls.map(w => ({
-    id: Date.now() + Math.random(),
-    type: "wall",
-    x1: w.x1,
-    y1: w.y1,
-    x2: w.x2,
-    y2: w.y2
-  }));
-
-  canvasObjects = [...canvasObjects, ...walls];
-
-  alert(`Detected ${data.count} wall segments ✅`);
-  redraw();
+  }).then(r => r.json()).then(() => alert("Plan Saved ✅"));
 }
 
 async function loadPlan() {
   const res = await fetch(`/load-plan/${PLAN_ID}`);
   const data = await res.json();
-
-  if (data.error) {
-    alert("Failed to load plan ❌");
-    return;
-  }
-
   canvasObjects = data.canvasObjects || [];
   redraw();
 }
 
-
 loadPlan();
-

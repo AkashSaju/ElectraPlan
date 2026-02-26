@@ -52,19 +52,25 @@ function nearestWall(px, py, walls) {
    ============================= */
 
 function buildRoomTopology(canvasObjects) {
-
   const rooms = canvasObjects.filter(o => o.type === "room");
   const walls = canvasObjects.filter(o => o.type === "wall");
   const doors = canvasObjects.filter(o => o.type === "door");
+  
+  // ✅ NEW: Filter for Sinks and Counters
+  const sinks = canvasObjects.filter(o => o.type === "sink");
+  const counters = canvasObjects.filter(o => o.type === "counter");
 
   const topology = [];
 
   for (const room of rooms) {
-
     const roomWalls = [];
     const roomDoors = [];
+    
+    // ✅ NEW: Arrays to hold appliances for this room
+    const roomSinks = [];
+    const roomCounters = [];
 
-    // map walls → room
+    // 1. Map walls → room
     for (const w of walls) {
       const mid = wallMidpoint(w);
       if (pointInsideRoom(mid.x, mid.y, room)) {
@@ -72,7 +78,26 @@ function buildRoomTopology(canvasObjects) {
       }
     }
 
-    // map doors → nearest wall → room
+    // 2. ✅ NEW: Map Sinks → room
+    for (const s of sinks) {
+      // Use midpoint of the sink to see if it's in the room
+      const midX = (s.x1 + s.x2) / 2;
+      const midY = (s.y1 + s.y2) / 2;
+      if (pointInsideRoom(midX, midY, room)) {
+        roomSinks.push(s);
+      }
+    }
+
+    // 3. ✅ NEW: Map Counters → room
+    for (const c of counters) {
+      const midX = (c.x1 + c.x2) / 2;
+      const midY = (c.y1 + c.y2) / 2;
+      if (pointInsideRoom(midX, midY, room)) {
+        roomCounters.push(c);
+      }
+    }
+
+    // 4. Map doors → nearest wall → room
     for (const d of doors) {
       const w = nearestWall(d.x, d.y, roomWalls);
       if (w) {
@@ -112,16 +137,18 @@ function buildRoomTopology(canvasObjects) {
         bottomWall = w;
       }
     }
-
-    topology.push({
-      room,
-      walls: roomWalls,
-      doors: roomDoors,
-      entryWall,
-      longestWall,
-      topWall,
-      bottomWall
-    });
+// Change your topology.push section for walls to this safe version:
+topology.push({
+  room,
+  walls: roomWalls,
+  doors: roomDoors,
+  sinks: roomSinks,
+  counters: roomCounters,
+  entryWall: roomDoors.length ? roomDoors[0].wall : (roomWalls[0] || null),
+  longestWall: roomWalls.length ? roomWalls.reduce((a, b) => wallLength(a) > wallLength(b) ? a : b) : null,
+  topWall: roomWalls.length ? roomWalls.reduce((a, b) => wallMidpoint(a).y < wallMidpoint(b).y ? a : b) : null,
+  bottomWall: roomWalls.length ? roomWalls.reduce((a, b) => wallMidpoint(a).y > wallMidpoint(b).y ? a : b) : null
+});
   }
 
   return topology;
