@@ -614,20 +614,26 @@ function previewOnly() {
 }
 
 async function applySelectedTemplate() {
-  let updated = planObjects.filter(o => !String(o.type).startsWith("elec_"));
+    // 1. Gather architecture and current electrical layout
+    let updated = planObjects.filter(o => !String(o.type).startsWith("elec_"));
+    const autoPoints = generateElectrical(planObjects, selectedTemplate);
+    const finalPoints = (selectedTemplate === 'custom') ? [...autoPoints, ...window.customItems] : autoPoints;
+    
+    updated = [...updated, ...finalPoints];
 
-  const points = generateElectrical(planObjects, selectedTemplate);
+    // 2. Save to Database
+    const res = await fetch(`/save-plan/${PLAN_ID}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated)
+    });
 
-  updated = [...updated, ...points];
-
-  await fetch(`/save-plan/${PLAN_ID}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(updated)
-  });
-
-  alert("Template applied ✅");
-  window.location.href = `/editor/${PLAN_ID}`;
+    if (res.ok) {
+        // 3. Redirect to the new Wiring Analysis & BOM Page
+        window.location.href = `/wiring/${PLAN_ID}`;
+    } else {
+        alert("Error saving plan. Please try again.");
+    }
 }
 
 window.selectTemplate = selectTemplate;

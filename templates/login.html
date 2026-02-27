@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ElectraPlan - Login</title>
+    <style>
+        body { background: #0b0f1a; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .login-card { background: rgba(255,255,255,0.03); padding: 40px; border-radius: 16px; border: 1px solid rgba(163,230,53,0.2); width: 320px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #334155; background: #131926; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #a3e635; color: #0b0f1a; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .logo { color: #a3e635; font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="logo">ElectraPlan</div>
+        <p>Enter your credentials to manage your plans</p>
+        <form action="/login" method="POST">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</body>
+</html>

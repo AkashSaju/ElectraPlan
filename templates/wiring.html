@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Electra Plan - Wiring & BOM</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        .wiring-grid { display: grid; grid-template-columns: 1fr 380px; height: 100vh; background: #0b0f1a; }
+        
+        /* Left Side: Canvas */
+        .canvas-area { position: relative; padding: 20px; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+        #wiringCanvas { background: #0E1428; border-radius: 16px; flex-grow: 1; border: 1px solid rgba(34,211,238,0.2); }
+        
+        /* Right Side: Sidebar */
+        .bom-panel { 
+            background: rgba(255,255,255,0.03); 
+            border-left: 1px solid rgba(255,255,255,0.1); 
+            padding: 24px; 
+            color: #fff; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; /* Keep sidebar exactly screen height */
+            box-sizing: border-box;
+        }
+
+        /* Scrollable Table Container */
+        .table-container { 
+            flex-grow: 1; 
+            overflow-y: auto; 
+            margin-bottom: 20px;
+            padding-right: 5px;
+        }
+        /* Custom Scrollbar for better look */
+        .table-container::-webkit-scrollbar { width: 6px; }
+        .table-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
+        .bom-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .bom-table th { text-align: left; color: #94a3b8; padding-bottom: 12px; border-bottom: 1px solid #334155; position: sticky; top: 0; background: #131926; }
+        .bom-table td { padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+        
+        /* Fixed Bottom Section */
+        .bottom-section { margin-top: auto; flex-shrink: 0; }
+        .total-box { 
+            padding: 20px; 
+            background: rgba(163,230,53,0.1); 
+            border-radius: 12px; 
+            border: 1px solid #a3e635; 
+            margin-bottom: 15px; 
+        }
+        
+        /* Legend */
+        .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .line { height: 3px; width: 18px; border-radius: 2px; }
+
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+        .primary { background: #a3e635; color: #0b0f1a; margin-bottom: 10px; }
+        .secondary { background: rgba(255,255,255,0.1); color: #fff; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* Print Hiding */
+        @media print { .secondary, .canvas-area, h2, p { display: none; } .bom-panel { border: none; width: 100%; } }
+    </style>
+</head>
+<body>
+
+<div class="wiring-grid">
+    <div class="canvas-area">
+        <div style="margin-bottom: 15px;">
+            <h2 style="color: #fff; margin:0;">Wiring Path Analysis</h2>
+            <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Plan ID: {{ plan_id }} | Professional Hub-and-Spoke Routing</p>
+        </div>
+        <canvas id="wiringCanvas"></canvas>
+    </div>
+
+    <aside class="bom-panel">
+        <h3 style="margin-top: 0;">Bill of Materials</h3>
+        
+        <div class="table-container">
+            <table class="bom-table">
+                <thead>
+                    <tr><th>Description</th><th>Qty/Unit</th></tr>
+                </thead>
+                <tbody id="bomBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div class="bottom-section">
+            <div class="legend">
+                <div class="legend-item"><div class="line" style="background: #EF4444;"></div> Feed Line</div>
+                <div class="legend-item"><div class="line" style="border: 1px dashed #EF4444;"></div> Oven (High)</div>
+                <div class="legend-item"><div class="line" style="background: #FACC15;"></div> Standard</div>
+                <div class="legend-item"><div class="line" style="border: 1px dashed #FDE047;"></div> Drop Line</div>
+            </div>
+
+            <div class="total-box">
+                <div style="font-size: 12px; color: #a3e635; margin-bottom: 5px;">Estimated Total Cost</div>
+                <div id="totalCost" style="font-size: 26px; font-weight: 700;">₹ 0</div>
+            </div>
+            
+            <button class="primary" onclick="window.print()">Export Report (PDF)</button>
+            <button class="secondary" onclick="location.href='/editor/{{plan_id}}'">Back to Editor</button>
+        </div>
+    </aside>
+</div>
+
+<script>
+    window.PLAN_ID = "{{ plan_id }}";
+</script>
+<script src="/static/room_topology_engine.js"></script>
+<script src="/static/wiring_logic.js"></script>
+
+</body>
+</html>
