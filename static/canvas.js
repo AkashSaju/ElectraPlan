@@ -589,6 +589,70 @@ window.addEventListener("keyup", (e) => {
   }
 });
 
+
+
+/* ---------------- IMPORT + DETECT ---------------- */
+function triggerImport() {
+  document.getElementById("planFile").click();
+}
+
+document.getElementById("planFile")?.addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch("/upload-plan", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    alert("Upload failed: " + data.error);
+    return;
+  }
+
+  importedFilename = data.filename;
+  alert("Plan imported ✅ Now click Detect Walls");
+});
+
+async function detectWalls() {
+  if (!importedFilename) {
+    alert("Please import a plan image first.");
+    return;
+  }
+
+  const res = await fetch("/detect-walls", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: importedFilename })
+  });
+
+  const data = await res.json();
+
+  if (data.error) {
+    alert("Detection failed: " + data.error);
+    return;
+  }
+
+  const walls = data.walls.map(w => ({
+    id: Date.now() + Math.random(),
+    type: "wall",
+    x1: w.x1,
+    y1: w.y1,
+    x2: w.x2,
+    y2: w.y2
+  }));
+
+  canvasObjects = [...canvasObjects, ...walls];
+
+  alert(`Detected ${data.count} wall segments ✅`);
+  redraw();
+}
+
 /* ---------------- ACTIONS ---------------- */
 function cancelDrawing() {
   isDrawing = false;

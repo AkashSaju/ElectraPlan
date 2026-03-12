@@ -1,26 +1,208 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>ElectraPlan</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electra Plan | Engineering the Future</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020617;
+            --primary: #22d3ee;
+            --accent: #6366f1;
+            --success: #a3e635;
+            --glass: rgba(15, 23, 42, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        
+        body {
+            background-color: var(--bg);
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* --- THE SCI-FI BACKGROUND --- */
+        .viewport-bg {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), #1e293b 0%, #020617 100%);
+        }
+
+        .grid {
+            position: absolute; inset: -50%; width: 200%; height: 200%;
+            background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(1000px) rotateX(60deg);
+            animation: grid-flow 30s linear infinite;
+        }
+
+        @keyframes grid-flow {
+            from { transform: perspective(1000px) rotateX(60deg) translateY(0); }
+            to { transform: perspective(1000px) rotateX(60deg) translateY(50px); }
+        }
+
+        /* --- NAVIGATION --- */
+        nav {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 1200px; height: 64px;
+            background: var(--glass); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 30px; z-index: 1000;
+        }
+
+        .nav-logo { font-weight: 800; font-size: 18px; letter-spacing: 1px; color: var(--primary); }
+        .nav-links { display: flex; gap: 25px; }
+        .nav-links a { text-decoration: none; color: #94a3b8; font-size: 13px; font-weight: 600; transition: 0.3s; }
+        .nav-links a:hover { color: #fff; }
+
+        /* --- HERO SECTION --- */
+        .hero {
+            height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            padding-top: 80px;
+        }
+
+        .badge {
+            background: rgba(34, 211, 238, 0.1); color: var(--primary);
+            padding: 6px 16px; border-radius: 99px; border: 1px solid var(--primary);
+            font-size: 12px; font-weight: 700; margin-bottom: 24px;
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        h1 {
+            font-size: clamp(40px, 8vw, 80px); font-weight: 800;
+            line-height: 1; margin-bottom: 24px;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .hero p { color: #94a3b8; font-size: 18px; max-width: 600px; margin-bottom: 40px; }
+
+        /* --- FEATURES GRID --- */
+        .features { padding: 100px 10%; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+        
+        .card {
+            background: var(--glass); border: 1px solid var(--border);
+            padding: 40px; border-radius: 24px; transition: 0.4s;
+        }
+        .card:hover { border-color: var(--primary); transform: translateY(-10px); background: rgba(34, 211, 238, 0.05); }
+        .card h3 { color: var(--primary); margin-bottom: 15px; }
+        .card p { color: #64748b; font-size: 14px; }
+
+        /* --- FORM & CONTACT --- */
+        .cta-section { padding: 100px 10%; display: flex; flex-direction: column; align-items: center; }
+        .contact-card {
+            width: 100%; max-width: 500px; background: var(--glass);
+            padding: 40px; border-radius: 32px; border: 1px solid var(--border);
+        }
+
+        input, textarea {
+            width: 100%; padding: 16px; margin-bottom: 16px;
+            background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+            border-radius: 12px; color: #fff; font-family: inherit;
+        }
+        input:focus { border-color: var(--primary); outline: none; }
+
+        .btn {
+            display: inline-block; padding: 16px 32px; border-radius: 14px;
+            font-weight: 700; cursor: pointer; transition: 0.3s; text-decoration: none; text-align: center;
+        }
+        .btn-primary { background: var(--accent); color: #fff; border: none; }
+        .btn-primary:hover { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); transform: scale(1.02); }
+
+        footer { padding: 40px; text-align: center; color: #475569; font-size: 12px; border-top: 1px solid var(--border); }
+    </style>
 </head>
 <body>
-  <h2>ElectraPlan – Wiring Planner</h2>
 
-  <input id="roomName" placeholder="Room Name"><br><br>
+    <div class="viewport-bg">
+        <div class="grid"></div>
+    </div>
 
-  <select id="roomType">
-    <option>Bedroom</option>
-    <option>Kitchen</option>
-    <option>Hall</option>
-  </select><br><br>
+    <nav>
+        <div class="nav-logo">ELECTRA PLAN</div>
+        <div class="nav-links">
+            <a href="#">Engine</a>
+            <a href="#about">Intelligence</a>
+            <a href="#contact">Terminal</a>
+            <a href="/login" style="color: var(--primary)">Login</a>
+        </div>
+    </nav>
 
-  <input id="length" placeholder="Length"><br><br>
-  <input id="width" placeholder="Width"><br><br>
+    <header class="hero">
+        <div class="badge">Next-Gen v2.0</div>
+        <h1>Design Smarter.<br>Wire Faster.</h1>
+        <p>The first automated hub-and-spoke electrical design engine for professional workstations.</p>
+        <div style="display: flex; gap: 15px;">
+            <a href="/register" class="btn btn-primary">Initialize Project</a>
+            <a href="#about" class="btn" style="color: #fff; border: 1px solid var(--border);">See Topology</a>
+        </div>
+    </header>
 
-  <button onclick="generate()">Generate</button>
+    <section class="features" id="about">
+        <div class="card">
+            <h3>Hub-and-Spoke</h3>
+            <p>Advanced topology mapping that organizes circuits into logical, centralized hubs for easier maintenance and safety.</p>
+        </div>
+        <div class="card">
+            <h3>Real-time BOM</h3>
+            <p>Automatic generation of Bill of Materials including conduit lengths, wire gauges, and regional pricing estimations.</p>
+        </div>
+        <div class="card">
+            <h3>Load Intelligence</h3>
+            <p>Calculates TCL and Amperage on-the-fly, recommending the correct MCB protection for every room.</p>
+        </div>
+    </section>
 
-  <pre id="output"></pre>
+    <section class="cta-section" id="contact">
+        <div class="contact-card">
+            <h2 style="margin-bottom: 20px; text-align: center;">Join the Grid</h2>
+            <form action="/register" method="POST">
+                <input type="text" name="username" placeholder="Username" required>
+                <input type="password" name="password" placeholder="Password" required>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Create Operator Account</button>
+            </form>
+            <p style="text-align: center; margin-top: 20px; font-size: 12px; color: #64748b;">
+                Already authorized? <a href="/login" style="color: var(--primary); text-decoration: none;">Login here</a>
+            </p>
+        </div>
+    </section>
 
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <footer>
+        <p>&copy; 2026 Electra Plan Systems. All rights reserved.</p>
+        <p>Engineering Excellence | Thiruvananthapuram, India</p>
+    </footer>
+
+    <script>
+        // Modern Interactive Background Tracking
+        document.addEventListener('mousemove', e => {
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            document.documentElement.style.setProperty('--mouse-x', `${x}%`);
+            document.documentElement.style.setProperty('--mouse-y', `${y}%`);
+        });
+
+        // Simple Scroll Reveal Logic
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = '0.8s ease-out';
+            observer.observe(card);
+        });
+    </script>
 </body>
 </html>

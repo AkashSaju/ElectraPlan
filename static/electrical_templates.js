@@ -4,7 +4,7 @@ const previewCanvas = document.getElementById("previewCanvas");
 const pctx = previewCanvas.getContext("2d");
 
 let planObjects = [];
-let selectedTemplate = "cost";
+window.selectedTemplate = "cost";
 
 
 // resize preview canvas to match CSS size
@@ -107,7 +107,6 @@ function snapToNearestWall(px, py, walls, offset = 14) {
 // ELECTRICAL PLACEMENT ENGINE (UPGRADED)
 // ============================
 function generateElectrical(objects, mode) {
-
   const topology = buildRoomTopology(objects);
   const elec = [];
 
@@ -134,26 +133,67 @@ function generateElectrical(objects, mode) {
   for (const t of topology) {
     const r = t.room;
     const label = (r.label || "").toLowerCase();
-
     const center = roomCenterPoint(r);
     const entryWall = t.entryWall || t.longestWall;
     const mainWall = t.longestWall;
-    const topWall = t.topWall;
-    const bottomWall = t.bottomWall;
 
-    // ================= CUSTOM =================
+    // ================= CUSTOM SECTION (FIXED) =================
     if (mode === "custom") {
-      if (mainWall) {
-        const light = wallMid(mainWall);
-        add("elec_light", light.x, light.y);
-      }
-      if (entryWall) {
-        const sw = wallMid(entryWall);
-        add("elec_switch", sw.x, sw.y);
-      }
-      continue; 
-    }
+      const rCenter = roomCenterPoint(r);
 
+      // --- FIX: Define oppositeWall for Custom Mode ---
+      let oppositeWall = t.longestWall; 
+      if (t.counters && t.counters.length > 0) {
+          const cMid = { x: (t.counters[0].x1 + t.counters[0].x2)/2, y: (t.counters[0].y1 + t.counters[0].y2)/2 };
+          const counterWall = nearestWall(cMid.x, cMid.y, t.walls);
+          if (counterWall) {
+              const cwMid = wallMid(counterWall);
+              oppositeWall = t.walls.reduce((prev, curr) => {
+                  const d1 = Math.hypot(wallMid(prev).x - cwMid.x, wallMid(prev).y - cwMid.y);
+                  const d2 = Math.hypot(wallMid(curr).x - cwMid.x, wallMid(curr).y - cwMid.y);
+                  return (d2 > d1) ? curr : prev;
+              });
+          }
+      }
+
+      // 1. CUSTOM AMBIENCE: 3-Point Lighting
+      if (oppositeWall) {
+        const len = wallLength(oppositeWall);
+        const xMin = Math.min(oppositeWall.x1, oppositeWall.x2);
+        const yMin = Math.min(oppositeWall.y1, oppositeWall.y2);
+        const pushX = rCenter.x > xMin ? 15 : -15;
+        const pushY = rCenter.y > yMin ? 15 : -15;
+        const isH = Math.abs(oppositeWall.x2 - oppositeWall.x1) > Math.abs(oppositeWall.y2 - oppositeWall.y1);
+
+        [0.2, 0.5, 0.8].forEach((pos, index) => {
+          if (isH) {
+            add("elec_light", xMin + (len * pos), yMin + pushY, `Custom Light ${index + 1}`);
+          } else {
+            add("elec_light", xMin + pushX, yMin + (len * pos), `Custom Light ${index + 1}`);
+          }
+        });
+      }
+
+      // 2. CUSTOM APPLIANCE HUB
+      if (label.includes("kitchen")) {
+        if (entryWall && oppositeWall) {
+          const cornerX = Math.max(entryWall.x1, entryWall.x2);
+          const cornerY = Math.max(entryWall.y1, entryWall.y2);
+          add("elec_socket", cornerX - 40, cornerY - 40, "Appliance Hub (32A)");
+        }
+        const roomArea = Math.abs((r.x2 - r.x1) * (r.y2 - r.y1));
+        if (roomArea > 50000) {
+          add("elec_socket", center.x, center.y, "Island Floor Socket");
+        }
+      }
+
+      // 3. SMART SWITCH
+      if (entryWall) {
+        const mid = wallMid(entryWall);
+        add("elec_switch", mid.x, mid.y, "Smart Panel");
+      }
+      continue; // Custom mode finished, skip other modes
+    }
     // ================= COST-EFFECTIVE =================
    // ================= COST-EFFECTIVE =================
    if (mode === "cost") {
@@ -252,53 +292,7 @@ if (t.counters && t.counters.length > 0) {
 }
 
 
-// ================= CUSTOM SECTION =================
-if (mode === "custom") {
-    const rCenter = roomCenterPoint(r);
-    
-    // 1. CUSTOM AMBIENCE: 3-Point Lighting (Professional Look)
-    if (oppositeWall) {
-        const len = wallLength(oppositeWall);
-        const xMin = Math.min(oppositeWall.x1, oppositeWall.x2);
-        const yMin = Math.min(oppositeWall.y1, oppositeWall.y2);
-        const pushX = rCenter.x > xMin ? 15 : -15;
-        const pushY = rCenter.y > yMin ? 15 : -15;
-        const isH = Math.abs(oppositeWall.x2 - oppositeWall.x1) > Math.abs(oppositeWall.y2 - oppositeWall.y1);
 
-        // Place 3 balanced lights for a high-end custom feel
-        [0.2, 0.5, 0.8].forEach((pos, index) => {
-            if (isH) {
-                add("elec_light", xMin + (len * pos), yMin + pushY, `Custom Light ${index + 1}`);
-            } else {
-                add("elec_light", xMin + pushX, yMin + (len * pos), `Custom Light ${index + 1}`);
-            }
-        });
-    }
-
-    // 2. CUSTOM APPLIANCE HUB: Grouped Power
-    if (label.includes("kitchen")) {
-        // Find the corner where entryWall and oppositeWall meet
-        if (entryWall && oppositeWall) {
-            const cornerX = Math.max(entryWall.x1, entryWall.x2);
-            const cornerY = Math.max(entryWall.y1, entryWall.y2);
-            
-            // Place a Heavy Duty Hub for Fridge + Microwave + Grinder
-            add("elec_socket", cornerX - 40, cornerY - 40, "Appliance Hub (32A)");
-        }
-
-        // 3. ISLAND/CENTER POWER: Only if the room is large enough
-        const roomArea = Math.abs((r.x2 - r.x1) * (r.y2 - r.y1));
-        if (roomArea > 50000) { // Example threshold for a large kitchen
-             add("elec_socket", center.x, center.y, "Island Floor Socket");
-        }
-    }
-
-    // 4. SMART SWITCH: Double Switch for Home Automation
-    if (entryWall) {
-        const mid = wallMid(entryWall);
-        add("elec_switch", mid.x, mid.y, "Smart Panel");
-    }
-}
     // ================= STANDARD (INTELLIGENT) =================
     if (mode === "standard") {
       // Basic Lighting & Fan
@@ -571,11 +565,21 @@ function drawElectrical(points) {
 // PREVIEW RENDER
 // ============================
 function drawPreview() {
-  drawGrid();
-  drawWallsAndRooms(planObjects);
+    pctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    drawGrid();
+    drawWallsAndRooms(planObjects);
 
-  const points = generateElectrical(planObjects, selectedTemplate);
-  drawElectrical(points);
+    let pointsToDraw = [];
+
+    if (selectedTemplate === 'custom' && typeof CustomModule !== 'undefined') {
+        // Only draw Akash's manual/edited points
+        pointsToDraw = CustomModule.getPoints(); 
+    } else {
+        // Only draw the computer's calculated points
+        pointsToDraw = generateElectrical(planObjects, selectedTemplate);
+    }
+
+    drawElectrical(pointsToDraw);
 }
 
 // ============================
@@ -592,21 +596,17 @@ async function loadPlan() {
 }
 
 function selectTemplate(mode) {
-  selectedTemplate = mode;
-
-  document.getElementById("card-cost").classList.remove("active");
-  document.getElementById("card-custom").classList.remove("active");
-  document.getElementById("card-standard").classList.remove("active");
-
-  document.getElementById(`card-${mode}`).classList.add("active");
-
-  const badge = document.getElementById("templateBadge");
-  badge.textContent =
-    mode === "cost" ? "Cost-Effective" :
-    mode === "custom" ? "Custom" :
-    "Standard";
-
-  drawPreview();
+    window.selectedTemplate = mode;
+    
+    const toolbox = document.getElementById('customToolsPanel');
+    if (mode === 'custom') {
+        toolbox.style.display = 'block';
+        // Now passing objects directly to CustomModule
+        CustomModule.init(planObjects); 
+    } else {
+        toolbox.style.display = 'none';
+    }
+    drawPreview();
 }
 
 function previewOnly() {
@@ -614,31 +614,47 @@ function previewOnly() {
 }
 
 async function applySelectedTemplate() {
-    // 1. Gather architecture and current electrical layout
-    let updated = planObjects.filter(o => !String(o.type).startsWith("elec_"));
-    const autoPoints = generateElectrical(planObjects, selectedTemplate);
-    const finalPoints = (selectedTemplate === 'custom') ? [...autoPoints, ...window.customItems] : autoPoints;
-    
-    updated = [...updated, ...finalPoints];
+  // 1. Remove old electrical points from the list to prevent doubles
+  let updated = planObjects.filter(o => !String(o.type).startsWith("elec_"));
+  
+  // 2. Decide what points to save based on the active template
+  let finalPoints = [];
+  if (selectedTemplate === 'custom') {
+    finalPoints = CustomModule.getPoints(); // Get Akash's hand-placed points
+  } else {
+    finalPoints = generateElectrical(planObjects, selectedTemplate); // Get auto-points
+  }
 
-    // 2. Save to Database
-    const res = await fetch(`/save-plan/${PLAN_ID}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updated)
-    });
+  // 3. Combine architecture with the new electrical points
+  updated = [...updated, ...finalPoints];
 
-    if (res.ok) {
-        // 3. Redirect to the new Wiring Analysis & BOM Page
-        window.location.href = `/wiring/${PLAN_ID}`;
-    } else {
-        alert("Error saving plan. Please try again.");
-    }
+  // 4. Save to Database and Go to Wiring Page
+  const res = await fetch(`/save-plan/${PLAN_ID}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updated)
+  });
+
+  if (res.ok) {
+    window.location.href = `/wiring/${PLAN_ID}`;
+  } else {
+    alert("Error saving. Please try again.");
+  }
 }
 
+function setActiveTool(tool) {
+  // Tell the Custom Brain which tool we are holding
+  CustomModule.setTool(tool);
+  
+  // Visual Feedback: Make the clicked button look active
+  document.querySelectorAll('.btn').forEach(b => b.classList.remove('active-tool'));
+  if (event && event.target) {
+    event.target.classList.add('active-tool');
+  }
+}
+
+// Make sure these are available to the HTML
 window.selectTemplate = selectTemplate;
-window.previewOnly = previewOnly;
+window.setActiveTool = setActiveTool;
 window.applySelectedTemplate = applySelectedTemplate;
-
-
 loadPlan();

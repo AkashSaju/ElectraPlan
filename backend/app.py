@@ -5,6 +5,7 @@ import json
 import cv2
 import numpy as np
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # --- Project Paths ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +21,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 app.config["UPLOAD_FOLDER"] = UPLOAD_DIR
-app.secret_key = "akash_electra_secret_2026" # Key for session security
+app.secret_key = "akash_electra_secret_2026" 
 
 # ---------------- DATABASE HELPERS ----------------
 
@@ -32,7 +33,6 @@ def get_db():
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-    # Users table
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +40,6 @@ def init_db():
             password TEXT NOT NULL
         )
     """)
-    # Plans table linked to user_id
     cur.execute("""
         CREATE TABLE IF NOT EXISTS plans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,24 +54,34 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize the DB on startup
 init_db()
 
 # ---------------- AUTHENTICATION ROUTES ----------------
 
-@app.route("/register-me")
-def register_me():
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        # Create default user Akash
-        cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("akash", "pass123"))
-        conn.commit()
-        return "User Akash created! Visit /login to start."
-    except Exception as e:
-        return f"User might already exist. Error: {e}"
-    finally:
-        conn.close()
+@app.route("/")
+def index():
+    if "user_id" in session:
+        
+        return render_template("index.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        username = request.form.get("username").lower().strip()
+        password = request.form.get("password")
+        hashed_pw = generate_password_hash(password)
+
+        conn = get_db()
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_pw))
+            conn.commit()
+            return redirect(url_for('login'))
+        except sqlite3.IntegrityError:
+            return "Username already exists!", 400
+        finally:
+            conn.close()
+    return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -84,28 +93,27 @@ def login():
         user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
 
-        if user and user["password"] == password:
+        if user and check_password_hash(user["password"], password):
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             return redirect(url_for("dashboard"))
         
-        return "Invalid username or password", 401
+        return "Invalid credentials", 401
     return render_template("login.html")
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("login"))
+    return redirect(url_for("index"))
 
-# ---------------- PLAN ROUTES (USER ISOLATED) ----------------
+# ---------------- PLAN ROUTES ----------------
 
-@app.route("/")
+@app.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
         return redirect(url_for("login"))
     
     conn = get_db()
-    # Filter by user_id so Akash only sees his plans
     plans = conn.execute(
         "SELECT * FROM plans WHERE user_id=? ORDER BY updated_at DESC", 
         (session["user_id"],)
@@ -181,7 +189,19 @@ def save_plan(plan_id):
     conn.close()
     return jsonify({"status": "saved"})
 
-# ---------------- WIRING & TEMPLATE VIEWS ----------------
+@app.route('/delete-plan/<int:plan_id>', methods=['POST'])
+def delete_plan(plan_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM plans WHERE id=? AND user_id=?", (plan_id, session["user_id"]))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('dashboard'))
+
+# ---------------- WIRING & TEMPLATES ----------------
 
 @app.route("/electrical-templates/<int:plan_id>")
 def electrical_templates(plan_id):
@@ -193,7 +213,7 @@ def wiring_view(plan_id):
     if "user_id" not in session: return redirect(url_for("login"))
     return render_template('wiring.html', plan_id=plan_id)
 
-# ---------------- COMPUTER VISION ROUTES ----------------
+# ---------------- CV ROUTES ----------------
 
 @app.route("/upload-plan", methods=["POST"])
 def upload_plan():
@@ -216,7 +236,6 @@ def detect_walls():
     if img is None:
         return jsonify({"error": "Image read failure"}), 400
 
-    # Process image for wall detection
     scale = 1200 / img.shape[1] if img.shape[1] > 1200 else 1.0
     if scale != 1.0:
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)

@@ -3,112 +3,407 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Electra Plan - Electrical Templates</title>
+  <title>Electra Plan - Electrical Intelligence</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* --- ELECTRA SYSTEM VARIABLES --- */
+    :root {
+      --bg-void: #020617;
+      --glass-panel: rgba(15, 23, 42, 0.7);
+      --glass-border: rgba(34, 211, 238, 0.15);
+      --electra-blue: #22d3ee;
+      --electra-glow: rgba(34, 211, 238, 0.2);
+      --success-neon: #a3e635;
+      --text-main: #f8fafc;
+      --text-dim: #64748b;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background: var(--bg-void);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- TOP BAR --- */
+    .top-bar {
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      background: var(--glass-panel);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--glass-border);
+      z-index: 100;
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand .title { font-weight: 800; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+
+    /* --- LAYOUT GRID --- */
+    .app-container {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      height: calc(100vh - 60px);
+      overflow: hidden;
+    }
+
+    /* --- PREVIEW SECTION --- */
+    .preview-section {
+      background: var(--glass-panel);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .preview-header {
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    #previewCanvas {
+      flex: 1;
+      width: 100%;
+      background: #0b0f1a;
+      border: none;
+      display: block;
+    }
+
+    /* --- TEMPLATE PICKER SECTION --- */
+    .picker-panel {
+      background: var(--glass-panel);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      backdrop-filter: blur(15px);
+    }
+
+    .picker-title { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+    .picker-sub { color: var(--text-dim); font-size:12px; margin-bottom: 24px; }
+
+    /* --- TEMPLATE CARDS --- */
+    .template-card {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      border-radius: 16px;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-bottom: 12px;
+    }
+
+    .template-card:hover {
+      background: rgba(34, 211, 238, 0.05);
+      border-color: var(--electra-blue);
+      transform: translateX(5px);
+    }
+
+    .template-card.active {
+      background: rgba(163, 230, 53, 0.05);
+      border-color: var(--success-neon);
+      box-shadow: 0 0 20px rgba(163, 230, 53, 0.1);
+    }
+
+    .template-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* --- CUSTOM TOOLS FLOATING PANEL --- */
+    #customToolsPanel {
+      position: absolute;
+      left: 20px;
+      top: 80px;
+      width: 220px;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-radius: 20px;
+      border: 1px solid var(--success-neon);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      z-index: 1000;
+    }
+
+
+
+    /* --- TOP BAR TITLES --- */
+.brand .title {
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  
+  /* The Gradient Magic */
+  background: linear-gradient(
+    to bottom,
+    #fff 20%, 
+    var(--electra-blue) 50%, 
+    #0891b2 80%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  
+  /* Subtle Outer Glow */
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.3));
+}
+
+.plan-breadcrumb {
+    color: var(--text-dim); 
+    font-size: 14px; /* Slightly larger for readability */
+    margin-left: 15px; 
+    opacity: 0.7;
+}
+
+/* --- THE TEMPLATE BADGE (MODE INSIGHTS) --- */
+#templateBadge {
+    padding: 8px 16px; 
+    border-radius: 8px; 
+    border: 1px solid var(--electra-blue); 
+    font-size: 12px; /* Better font size */
+    font-weight: 700; 
+    text-transform: uppercase; 
+    color: var(--electra-blue); 
+    background: rgba(34, 211, 238, 0.1);
+    min-width: 140px; /* Ensures it doesn't jump when text changes */
+    text-align: center;
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.1);
+}
+
+/* --- TEMPLATE LIST CONTAINER --- */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+/* --- THE TEMPLATE CARD --- */
+.template-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hover Effect: Glow and Slide */
+.template-card:hover {
+  background: rgba(34, 211, 238, 0.05);
+  border-color: var(--electra-blue);
+  transform: translateX(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Active State: The "Selected" look */
+.template-card.active {
+  background: rgba(163, 230, 53, 0.08); /* Success Neon tint */
+  border-color: var(--success-neon);
+  box-shadow: 0 0 20px rgba(163, 230, 53, 0.15);
+}
+
+/* Left Icon Container */
+.template-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+/* Change icon color when card is active */
+.template-card.active .template-icon {
+  background: var(--success-neon);
+  color: #000;
+  border-color: var(--success-neon);
+}
+
+/* Text Content */
+.template-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.template-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+/* Subtle pulse animation for the active card */
+.template-card.active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  border-radius: 20px;
+  border: 2px solid var(--success-neon);
+  animation: card-pulse 2s infinite;
+  pointer-events: none;
+}
+
+@keyframes card-pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.02); opacity: 0; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+    .tool-item {
+      background: rgba(255,255,255,0.03);
+      color: #fff;
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      cursor: grab;
+      font-size: 13px;
+      border: 1px solid rgba(255,255,255,0.05);
+      transition: 0.2s;
+    }
+
+    .tool-item:hover { border-color: var(--success-neon); background: rgba(163, 230, 53, 0.1); }
+
+    /* --- BUTTONS --- */
+    .primary {
+      background: var(--success-neon); color: #000; border: none;
+      padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s;
+    }
+    .primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(163, 230, 53, 0.4); }
+
+    .secondary {
+      background: transparent; color: var(--text-dim);
+      border: 1px solid var(--glass-border); padding: 10px 20px;
+      border-radius: 10px; cursor: pointer; transition: 0.2s;
+    }
+    .secondary:hover { border-color: #fff; color: #fff; }
+
+    .delete-btn { width: 100%; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 10px; border-radius: 10px; cursor: pointer; }
+  </style>
 </head>
 
 <body>
 
 <header class="top-bar">
   <div class="brand">
-    <span class="logo"></span>
+    <div style="width:12px; height:12px; background:var(--electra-blue); border-radius:50%; box-shadow:0 0 12px var(--electra-blue);"></div>
     <span class="title">Electra Plan</span>
-    <span style="color: var(--text-muted); font-size: 13px;">
-      / Electrical Templates / {{ plan_name }} (ID: {{ plan_id }})
+    <span style="color: var(--text-dim); font-size: 12px; margin-left: 15px; opacity: 0.6;">
+      / Intelligence / {{ plan_name }} (ID: {{ plan_id }})
     </span>
   </div>
 
   <div class="actions">
     <a href="/editor/{{ plan_id }}" style="text-decoration:none;">
-      <button class="secondary">Back</button>
+      <button class="secondary">Return to Editor</button>
     </a>
   </div>
 </header>
 
-<div style="height: calc(100vh - 56px); display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; padding: 14px;">
-
-  <!-- LEFT: PREVIEW -->
-  <section style="border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); position: relative;">
-    <div style="display:flex; justify-content:space-between; align-items:center; padding: 14px 14px 0;">
+<main class="app-container">
+  <section class="preview-section">
+    <div class="preview-header">
         <div>
-            <div style="font-weight: 700; font-size: 16px;">Template Preview</div>
-            <div style="color: var(--text-muted); font-size: 12px;">Preview updates instantly based on selection.</div>
+            <div style="font-weight: 700; font-size: 16px;">Intelligence Preview</div>
+            <div style="color: var(--text-dim); font-size: 12px;">Real-time topology visualization.</div>
         </div>
-        <div id="templateBadge" style="padding:6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); font-size: 12px; color: var(--text-main); background: rgba(59,130,246,0.15);">
-            Cost-Effective
+        <div id="templateBadge" style="padding:6px 12px; border-radius: 999px; border: 1px solid var(--glass-border); font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--electra-blue); background: rgba(34,211,238,0.1);">
+          
         </div>
     </div>
 
-    <div id="customToolsPanel" class="controls-panel" style="display: none;">
-        <h3>Kitchen Components</h3>
+    <div id="customToolsPanel" style="display: none;">
+        <h3 style="color: var(--success-neon); font-size: 12px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">Kitchen Components</h3>
+        
         <div class="tool-group">
-            <p>Mandatory</p>
-            <button class="btn" onclick="setActiveTool('elec_fan')">Ceiling Fan</button>
-            <button class="btn" onclick="setActiveTool('elec_switch')">Main Switch Board</button>
+            <p style="font-size: 9px; color: var(--text-dim); margin-bottom: 8px;">MANDATORY</p>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_fan')">🌀 Ceiling Fan</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_switch')">🎛️ Switch Board</div>
         </div>
+        
         <div class="tool-group">
-            <p>Appliances</p>
-            <button class="btn" onclick="setActiveTool('elec_socket_fridge')">Fridge Point</button>
-            <button class="btn" onclick="setActiveTool('elec_socket_mixi')">Mixi Point</button>
-            <button class="btn" onclick="setActiveTool('elec_socket_oven')">Oven Point</button>
+            <p style="font-size: 9px; color: var(--text-dim); margin: 15px 0 8px;">APPLIANCES</p>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_fridge')">🔌 Fridge Point</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_mixi')">🔌 Mixi Point</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_oven')">🔌 Oven Point</div>
         </div>
-        <button class="btn delete-btn" onclick="setActiveTool('delete')">❌ Remove Item</button>
+
+        <button class="delete-btn" onclick="setActiveTool('delete')" style="margin-top: 20px;">❌ Remove Element</button>
     </div>
 
-    <div style="padding: 14px;">
-        <canvas id="previewCanvas" style="width:100%; height: calc(100vh - 160px); display:block; border-radius: 14px; background: #0E1428;"></canvas>
-    </div>
-</section>
+    <canvas id="previewCanvas"></canvas>
+  </section>
 
-  <!-- RIGHT: TEMPLATE PICKER -->
-  <aside style="border-radius: 16px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); padding: 14px; display:flex; flex-direction:column;">
-    <div style="font-weight:700; font-size:16px; margin-bottom: 6px;">Choose Template</div>
-    <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 12px;">
-      These templates auto-place electrical points based on rooms.
-    </div>
+  <aside class="picker-panel">
+    <div class="picker-title">Auto-Layout Engine</div>
+    <div class="picker-sub">Select an electrical placement logic to apply to your plan.</div>
 
-    <div style="display:grid; gap: 12px;">
-
+    <div class="template-list">
       <div class="template-card" onclick="selectTemplate('cost')" id="card-cost">
         <div class="template-icon">₹</div>
-        <div style="flex:1;">
+        <div>
           <div class="template-title">Cost-Effective</div>
-          <div class="template-sub">Minimal points, budget friendly</div>
+          <div class="template-sub">Minimal nodes, optimized for budget.</div>
         </div>
       </div>
 
       <div class="template-card" onclick="selectTemplate('custom')" id="card-custom">
         <div class="template-icon">✎</div>
-        <div style="flex:1;">
-          <div class="template-title">Custom</div>
-          <div class="template-sub">User can add/edit everything</div>
+        <div>
+          <div class="template-title">Custom Designer</div>
+          <div class="template-sub">Manual control over every point.</div>
         </div>
       </div>
 
       <div class="template-card" onclick="selectTemplate('standard')" id="card-standard">
         <div class="template-icon">⚡</div>
-        <div style="flex:1;">
-          <div class="template-title">Standard</div>
-          <div class="template-sub">Balanced comfort + safety</div>
+        <div>
+          <div class="template-title">Standard Comfort</div>
+          <div class="template-sub">Balanced ergonomics and safety.</div>
         </div>
       </div>
-
     </div>
 
-    <hr class="divider" style="margin: 14px 0;">
+    
 
-    <div style="color: var(--text-muted); font-size: 12px; line-height: 1.5;">
-      <b>Kitchen sockets:</b> Fridge, Mixi, General<br>
-      <b>Bathroom:</b> no socket in Cost-Effective
-    </div>
-
-    <div style="margin-top:auto; display:flex; gap: 10px; padding-top: 14px;">
-      <button class="secondary" style="flex:1;" onclick="previewOnly()">Preview</button>
-      <button class="primary" style="flex:1;" onclick="applySelectedTemplate()">Apply</button>
+    <div style="margin-top:auto; display:flex; gap: 12px; padding-top: 20px;">
+      <button class="secondary" style="flex:1;" onclick="previewOnly()">Update Preview</button>
+      <button class="primary" style="flex:1;" onclick="applySelectedTemplate()">Apply to Plan</button>
     </div>
   </aside>
-
-</div>
+</main>
 
 <script>
   window.PLAN_ID = parseInt("{{ plan_id }}", 10);
@@ -116,47 +411,7 @@
 
 <script src="/static/room_topology_engine.js"></script>
 <script src="/static/electrical_templates.js"></script>
-
-
-<style>
-  .template-card{
-    display:flex;
-    gap: 12px;
-    padding: 12px;
-    border-radius: 14px;
-    cursor:pointer;
-    border:1px solid rgba(255,255,255,0.12);
-    background: rgba(255,255,255,0.02);
-    transition: 0.2s ease;
-  }
-  .template-card:hover{
-    border-color: rgba(34,211,238,0.5);
-    box-shadow: 0 0 14px rgba(34,211,238,0.18);
-  }
-  .template-card.active{
-    border-color: rgba(163,230,53,0.7);
-    box-shadow: 0 0 18px rgba(163,230,53,0.18);
-  }
-  .template-icon{
-    width:40px;
-    height:40px;
-    border-radius:12px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:700;
-    background: rgba(59,130,246,0.18);
-    border: 1px solid rgba(255,255,255,0.10);
-  }
-  .template-title{
-    font-weight:700;
-    font-size:14px;
-  }
-  .template-sub{
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-</style>
+<script src="/static/custom_logic.js"></script>
 
 </body>
 </html>

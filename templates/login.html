@@ -2,24 +2,236 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ElectraPlan - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electra Plan | Authorization Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
-        body { background: #0b0f1a; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .login-card { background: rgba(255,255,255,0.03); padding: 40px; border-radius: 16px; border: 1px solid rgba(163,230,53,0.2); width: 320px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid #334155; background: #131926; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; background: #a3e635; color: #0b0f1a; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .logo { color: #a3e635; font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+        :root {
+            --bg-void: #020617;
+            --primary: #22d3ee;
+            --accent: #6366f1;
+            --glass: rgba(15, 23, 42, 0.65);
+            --border: rgba(34, 211, 238, 0.2);
+            --glow: rgba(34, 211, 238, 0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-void);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* --- THE UNIVERSE BACKGROUND --- */
+        .universe {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), #1e293b 0%, #020617 100%);
+        }
+
+        .grid-overlay {
+            position: absolute; inset: -50%; width: 200%; height: 200%;
+            background-image: 
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: perspective(1000px) rotateX(60deg);
+            animation: move-grid 25s linear infinite;
+            opacity: 0.4;
+            z-index: 1; /* Behind the wires */
+        }
+
+        @keyframes move-grid {
+            from { transform: perspective(1000px) rotateX(60deg) translateY(0); }
+            to { transform: perspective(1000px) rotateX(60deg) translateY(60px); }
+        }
+
+        #wireCanvas {
+            position: absolute; inset: 0;
+            opacity: 0.7;
+            z-index: 2; /* On top of grid, behind card */
+        }
+
+        /* --- THE LOGIN CARD --- */
+        .login-card {
+            background: var(--glass);
+            backdrop-filter: blur(30px);
+            padding: 60px 50px;
+            border-radius: 40px;
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+            overflow: hidden;
+            z-index: 10; /* Top layer */
+            box-shadow: 
+                0 0 0 1px var(--border),
+                0 30px 60px -12px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Scanning Animation */
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: -100%; left: 0;
+            width: 100%; height: 100%;
+            background: linear-gradient(to bottom, transparent, var(--glow), transparent);
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% { top: -100%; }
+            100% { top: 100%; }
+        }
+
+        .logo-mark {
+            font-weight: 800; font-size: 28px; letter-spacing: 4px; text-align: center;
+            background: linear-gradient(135deg, #fff 30%, var(--primary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; text-align: center;
+            color: var(--primary); text-transform: uppercase; letter-spacing: 2px;
+            margin-bottom: 45px; opacity: 0.8;
+        }
+
+        .form-group { position: relative; margin-bottom: 24px; }
+        .form-group label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748b; margin-bottom: 8px; }
+
+        input {
+            width: 100%; padding: 16px 24px; background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border); border-radius: 16px; color: #fff;
+            transition: all 0.4s ease;
+        }
+        input:focus { border-color: var(--primary); background: rgba(34, 211, 238, 0.05); transform: scale(1.02); outline: none;}
+
+        button {
+            width: 100%; padding: 18px; background: var(--accent); color: #fff;
+            border: none; border-radius: 16px; font-weight: 800; text-transform: uppercase;
+            cursor: pointer; transition: 0.3s; margin-top: 10px;
+        }
+        button:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(99, 102, 241, 0.4); }
+
+        .footer-links { margin-top: 35px; text-align: center; font-size: 12px; color: #64748b; }
+        .footer-links a { color: var(--primary); text-decoration: none; font-weight: 700; }
     </style>
 </head>
 <body>
-    <div class="login-card">
-        <div class="logo">ElectraPlan</div>
-        <p>Enter your credentials to manage your plans</p>
-        <form action="/login" method="POST">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Login</button>
-        </form>
+
+    <div class="universe">
+        <div class="grid-overlay"></div>
+        <canvas id="wireCanvas"></canvas>
     </div>
+
+    <div class="login-card">
+        <div class="logo-mark">ELECTRA PLAN</div>
+        <div class="subtitle">System Identity Verification</div>
+
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label>Operator ID</label>
+                <input type="text" name="username" placeholder="Username" required autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Security Code</label>
+                <input type="password" name="password" placeholder="••••••••" required>
+            </div>
+            <button type="submit">Initialize Session</button>
+        </form>
+
+        <div class="footer-links">
+            New Operator? <a href="/register">Register Enrollment</a>
+        </div>
+    </div>
+
+    <script>
+        // --- WIRE ENGINE ---
+        const canvas = document.getElementById('wireCanvas');
+        const ctx = canvas.getContext('2d');
+        let wires = [];
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Wire {
+            constructor() { this.reset(); }
+            reset() {
+                this.x = Math.floor(Math.random() * canvas.width / 40) * 40;
+                this.y = Math.floor(Math.random() * canvas.height / 40) * 40;
+                this.length = 0;
+                this.maxLength = 20 + Math.random() * 50;
+                this.speed = 2;
+                this.dir = Math.floor(Math.random() * 4);
+                const colors = ['#b87333', '#22d3ee', '#ef4444', '#94a3b8'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.width = 3 + Math.random() * 2;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.lineWidth = this.width;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = this.color;
+                ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                ctx.shadowBlur = 4;
+                
+                let oldX = this.x; let oldY = this.y;
+                if (this.dir === 0) this.x += this.speed;
+                else if (this.dir === 1) this.x -= this.speed;
+                else if (this.dir === 2) this.y += this.speed;
+                else if (this.dir === 3) this.y -= this.speed;
+
+                ctx.moveTo(oldX, oldY);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+
+                // Highlight for 3D look
+                ctx.beginPath();
+                ctx.lineWidth = this.width / 3;
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.moveTo(oldX, oldY);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+
+                this.length++;
+                if (this.length % 40 === 0 && Math.random() > 0.5) this.dir = Math.floor(Math.random() * 4);
+                if (this.length > this.maxLength || this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
+            }
+        }
+
+        for(let i=0; i<15; i++) wires.push(new Wire());
+
+        function animate() {
+            // Keep background transparent enough to see the CSS grid-overlay
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            // Optional: use a very faint clear to keep trails
+            // ctx.fillStyle = 'rgba(2, 6, 23, 0.1)';
+            // ctx.fillRect(0,0, canvas.width, canvas.height);
+
+            wires.forEach(w => w.draw());
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // Interactive Glow
+        document.addEventListener('mousemove', e => {
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            document.documentElement.style.setProperty('--mouse-x', `${x}%`);
+            document.documentElement.style.setProperty('--mouse-y', `${y}%`);
+        });
+    </script>
 </body>
 </html>

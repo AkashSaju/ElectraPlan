@@ -5,23 +5,38 @@ let planObjects = [];
 /**
  * 1. INITIALIZATION: Load data and setup canvas
  */
-let selectedMode = 'standard'; // Global variable to hold the mode
+let planName = "Kitchen Project"; 
 
 async function init() {
     try {
         const res = await fetch(`/load-plan/${window.PLAN_ID}`);
         const data = await res.json();
         planObjects = data.canvasObjects || [];
+        planName = data.name || "Kitchen Project";
 
-        // Capture the mode from the URL (e.g., ?mode=cost)
+        // Display name in the UI for the report
+        const titleEl = document.getElementById("planNameDisplay");
+        if(titleEl) titleEl.innerText = planName;
+
         const urlParams = new URLSearchParams(window.location.search);
         selectedMode = urlParams.get('mode') || 'standard'; 
 
         resize();
-        render(); // This will now use the captured selectedMode
+        render(); 
     } catch (err) {
         console.error("Failed to load plan:", err);
     }
+}
+
+// Adjusted for better PDF contrast
+function drawLabel(text, x, y, color) {
+    ctx.fillStyle = color;
+    ctx.font = "bold 12px Arial"; // Slightly larger for print
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(text, x, y);
+    ctx.shadowBlur = 0; 
 }
 
 function render() {
@@ -190,8 +205,54 @@ function calculateRealWorldPath(start, end, walls, room) {
     return [start, p1, p2, end]; 
 }
 
+
+/**
+ * 7. LOAD CALCULATION ENGINE
+ * Defines standard wattage for Kerala-standard residential fittings
+ */
+const LOAD_SPECS = {
+    elec_fan: { watts: 75, amp: 0.3 },
+    elec_switch: { watts: 10, amp: 0.04 }, // Idle/indicator
+    elec_socket_fridge: { watts: 500, amp: 2.2 },
+    elec_socket_mixi: { watts: 750, amp: 3.3 },
+    elec_socket_oven: { watts: 2000, amp: 8.7 },
+    elec_socket_water: { watts: 1500, amp: 6.5 },
+    elec_light: { watts: 12, amp: 0.05 }
+};
+
+function calculateTotalLoad(points) {
+    let totalWatts = 0;
+    let highLoadPoints = 0;
+
+    points.forEach(p => {
+        // Find the matching spec or default to 60W
+        const spec = LOAD_SPECS[p.type] || { watts: 60, amp: 0.25 };
+        totalWatts += spec.watts;
+        if (spec.watts > 1000) highLoadPoints++;
+    });
+
+    // Determine Required MCB based on current
+    const totalAmps = totalWatts / 230; // Standard voltage in India
+    let recommendedMCB = "16A";
+    if (totalAmps > 16) recommendedMCB = "25A";
+    if (totalAmps > 25) recommendedMCB = "32A";
+
+    return {
+        tcl: totalWatts,
+        amps: totalAmps.toFixed(2),
+        mcb: recommendedMCB,
+        isHeavy: highLoadPoints > 0
+    };
+}
+
+
+
 /**
  * 5. BILL OF MATERIALS (BOM) ENGINE
+ */
+/**
+ * UPDATED BOM ENGINE
+ * Now includes Load Calculation, MCB Selection, and Wire Gauge Analysis
  */
 function updateBOM(points, topology, mode = 'cost') {
     let conduitMtrs = 0;
@@ -199,44 +260,78 @@ function updateBOM(points, topology, mode = 'cost') {
     const fan = points.find(p => p.type.includes('fan'));
     if (!mb || !fan) return;
 
-    // --- LOCAL KERALA MARKET RATES (Cost-Effective Tier) ---
+    // --- 1. LOAD CALCULATION SPECS ---
+    const loadSpecs = {
+        elec_fan: 75,
+        elec_light: 12,
+        elec_socket_fridge: 500,
+        elec_socket_mixi: 750,
+        elec_socket_oven: 2000,
+        elec_socket_water: 1500,
+        elec_switch: 0
+    };
+
+    let totalWatts = 0;
+    let highLoadDetected = false;
+
+    // --- 2. PRICING & MATERIALS ---
     const pricing = {
-        conduit: 28,      // Local 20mm PVC
-        wire: 18,         // 1.0sqmm (For budget lighting)
-        switch: 35,       // Standard Modular
-        socket: 65,       // 6A Socket
-        labor: 150,       // Local per-point rate
-        junctionBox: 15   // PVC Deep box
+        conduit: 28,
+        wire1_0: 18,   // For Lighting
+        wire2_5: 45,   // For Power/High Load
+        switch: 35,
+        socket: 65,
+        labor: 150,
+        junctionBox: 15,
+        mcb16: 280,
+        mcb32: 450
     };
 
     points.forEach(p => {
+        // Load Tracking
+        const watts = loadSpecs[p.type] || 60;
+        totalWatts += watts;
+        if (watts > 1000) highLoadDetected = true;
+
         if (p === mb) return;
         const roomT = topology.find(t => isInside(p.x, p.y, t.room));
         if (!roomT) return;
 
-        // Path Calculation
+        // Path Calculation (Conduit)
         if (isPointOnSameWall(p, mb, roomT.walls) && p.type.includes('light')) {
-            conduitMtrs += 1.2; // Optimized short drop
+            conduitMtrs += 1.2;
         } else if (p === fan) {
-            conduitMtrs += (Math.hypot(fan.x - mb.x, fan.y - mb.y) * 0.05); // Direct Slab
+            conduitMtrs += (Math.hypot(fan.x - mb.x, fan.y - mb.y) * 0.05);
         } else {
             const path = calculateRealWorldPath(fan, p, roomT.walls, roomT.room);
-            conduitMtrs += (getPathDist(path) * 0.05) + 1.8; // Optimized drop
+            conduitMtrs += (getPathDist(path) * 0.05) + 1.8;
         }
     });
 
-    const totalWireMtrs = Math.ceil((conduitMtrs * 3) * 1.05); // 5% waste
+    // --- 3. SYSTEM CALCULATIONS ---
+    const totalAmps = (totalWatts / 230).toFixed(2);
+    const mcbRequired = totalAmps > 16 ? "32A DP" : "16A SP";
+    
+    const totalWireMtrs = Math.ceil((conduitMtrs * 3) * 1.05);
     const socketCount = points.filter(p => p.type.includes('socket')).length;
     const switchCount = points.filter(p => p.type.includes('switch')).length;
 
-    // --- THE DETAILED PURCHASE LIST ---
+    // --- 4. THE COMPOSITE PURCHASE LIST ---
     const items = [
+        // Load Analytics (Displayed as Info)
+        { name: "Total Connected Load (TCL)", qty: (totalWatts / 1000).toFixed(2) + " kW", rate: 0, isSystem: true },
+        { name: "Calculated Current (Amps)", qty: totalAmps + " A", rate: 0, isSystem: true },
+        
+        // Physical Components
+        { name: `Main Protection MCB (${mcbRequired})`, qty: "1 nos", rate: totalAmps > 16 ? pricing.mcb32 : pricing.mcb16 },
         { name: "20mm PVC Conduit (Light Gauge)", qty: Math.ceil(conduitMtrs) + " m", rate: pricing.conduit },
-        { name: "1.0 sqmm FR Wire (Lighting Bundle)", qty: totalWireMtrs + " m", rate: pricing.wire },
+        { name: "1.0 sqmm FR Wire (Lighting)", qty: totalWireMtrs + " m", rate: pricing.wire1_0 },
+        
+        // Add Heavy Wire if High Load detected
+        ...(highLoadDetected ? [{ name: "2.5 sqmm FR Wire (Power Circuits)", qty: "45 m", rate: pricing.wire2_5 }] : []),
+        
         { name: "PVC Deep Junction Boxes", qty: points.length + " nos", rate: pricing.junctionBox },
-        { name: "20mm PVC Bends/Couplings", qty: Math.ceil(conduitMtrs / 2) + " nos", rate: 8 },
-        { name: "Modular Switches (Standard)", qty: switchCount + " nos", rate: pricing.switch },
-        { name: "Modular Sockets (6A)", qty: socketCount + " nos", rate: pricing.socket },
+        { name: "Modular Switches/Sockets", qty: (switchCount + socketCount) + " nos", rate: pricing.switch },
         { name: "Electrician Labor (Point Basis)", qty: points.length + " pts", rate: pricing.labor }
     ];
 
@@ -247,21 +342,29 @@ function renderBOMTable(items) {
     const bomBody = document.getElementById("bomBody");
     if (!bomBody) return;
 
-    bomBody.innerHTML = items.map(i => `
-        <tr>
-            <td>
-                <b style="color: #fff;">${i.name}</b><br>
-                <small style="color: #94a3b8;">Unit Rate: ₹${i.rate}</small>
-            </td>
-            <td style="text-align: right; font-weight: bold; color: #a3e635;">${i.qty}</td>
-        </tr>
-    `).join('');
+    bomBody.innerHTML = items.map(i => {
+        // System rows get a cyan highlight, physical rows look standard
+        const rowStyle = i.isSystem ? 'background: rgba(34, 211, 238, 0.05); border-left: 2px solid #22d3ee;' : '';
+        const qtyColor = i.isSystem ? '#22d3ee' : '#a3e635';
 
-    const total = items.reduce((sum, i) => sum + (parseFloat(i.qty) * i.rate), 0);
+        return `
+            <tr style="${rowStyle}">
+                <td style="padding: 12px 10px;">
+                    <b style="color: #fff;">${i.name}</b><br>
+                    <small style="color: #94a3b8;">${i.rate > 0 ? 'Unit Rate: ₹' + i.rate : 'System Value'}</small>
+                </td>
+                <td style="text-align: right; font-weight: bold; color: ${qtyColor}; padding: 12px 10px;">
+                    ${i.qty}
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Calculate Grand Total (Filtering out System Info rows with 0 rate)
+    const total = items.reduce((sum, i) => sum + (parseFloat(i.qty) * i.rate || 0), 0);
     const costEl = document.getElementById("totalCost");
     if (costEl) costEl.innerText = "₹ " + Math.round(total).toLocaleString('en-IN');
 }
-
 /**
  * 6. UTILITY FUNCTIONS
  */

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electra Plan | Enrollment Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-void: #020617;
+            --primary: #22d3ee;
+            --accent: #6366f1;
+            --success: #a3e635;
+            --glass: rgba(15, 23, 42, 0.8);
+            --border: rgba(34, 211, 238, 0.15);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg-void);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- THE SPLIT LAYOUT --- */
+        .info-side {
+            flex: 1;
+            padding: 60px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(34, 211, 238, 0.05) 0%, transparent 100%);
+            border-right: 1px solid var(--border);
+        }
+
+        .form-side {
+            width: 450px;
+            background: rgba(2, 6, 23, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        /* --- BACKGROUND DECORATION --- */
+        .grid-bg {
+            position: fixed; inset: 0; z-index: -1;
+            background-image: radial-gradient(var(--border) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+
+        /* --- INFO SIDE ELEMENTS --- */
+        .system-status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--primary);
+            background: rgba(34, 211, 238, 0.05);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .brand-logo {
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: 2px;
+            color: #fff;
+        }
+
+        .hero-text h1 {
+            font-size: 48px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* --- REGISTRATION CARD --- */
+        .reg-card {
+            width: 100%;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 28px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .step-indicator {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+
+        .step-dot { height: 4px; flex: 1; background: var(--border); border-radius: 2px; }
+        .step-dot.active { background: var(--primary); box-shadow: 0 0 10px var(--primary); }
+
+        input {
+            width: 100%;
+            padding: 16px;
+            margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: #fff;
+            outline: none;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            background: rgba(0, 0, 0, 0.6);
+        }
+
+        button {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .login-link {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #64748b;
+            text-decoration: none;
+        }
+        
+        .login-link b { color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div class="grid-bg"></div>
+
+    <aside class="info-side">
+        <div class="brand-logo">ELECTRA<span style="color: var(--primary);">PLAN</span></div>
+        
+        <div class="hero-text">
+            <h1>Join the Engineering Grid.</h1>
+            <p style="color: #94a3b8; font-size: 18px;">Access automated pathfinding, real-time load analytics, and professional BOM tools.</p>
+        </div>
+
+        <div class="system-status">
+            <div>> SYSTEM_STATUS: OPERATIONAL</div>
+            <div>> LOCATION: THIRUVANANTHAPURAM_NODE</div>
+            <div>> COPPER_INDEX: ₹742.50/KG</div>
+            <div>> SECURITY_LEVEL: ENCRYPTED_HASH</div>
+        </div>
+    </aside>
+
+    <main class="form-side">
+        <div class="reg-card">
+            <div class="step-indicator">
+                <div class="step-dot active"></div>
+                <div class="step-dot"></div>
+                <div class="step-dot"></div>
+            </div>
+
+            <h2 style="margin-bottom: 10px; font-size: 24px;">New Operator</h2>
+            <p style="color: #64748b; font-size: 13px; margin-bottom: 30px;">Initialize your workstation identity.</p>
+
+            <form method="POST" action="/register">
+                <input type="text" name="username" placeholder="Identity (Username)" required>
+                <input type="password" name="password" placeholder="Security Key (Password)" required>
+                <button type="submit">Complete Enrollment</button>
+            </form>
+
+            <a href="/login" class="login-link">Already authorized? <b>Login to Terminal</b></a>
+        </div>
+    </main>
+
+    <script>
+        // Subtle typewriter effect for the system status
+        const statusBox = document.querySelector('.system-status');
+        const lines = statusBox.children;
+        Array.from(lines).forEach((line, i) => {
+            line.style.opacity = '0';
+            setTimeout(() => {
+                line.style.opacity = '1';
+                line.style.transition = 'opacity 0.5s';
+            }, i * 300);
+        });
+    </script>
+</body>
+</html>
