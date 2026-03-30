@@ -198,10 +198,12 @@ function generateElectrical(objects, mode) {
    // ================= COST-EFFECTIVE =================
    if (mode === "cost") {
     // 1. CEILING FAN (Always Central)
-    add("elec_fan", center.x, center.y, "Fan");
+    // Fan removed as requested
 
     if (label.includes("kitchen")) {
         const rCenter = roomCenterPoint(r);
+        // Add centered ceiling fan exclusively for kitchen in Cost mode
+        add("elec_fan", center.x, center.y, "Fan");
         
         // --- 2. THE "CLEAN" WALL (Opposite the Counter) ---
         // We use t.longestWall as the base for the opposite calculation
@@ -300,6 +302,9 @@ if (t.counters && t.counters.length > 0) {
      
     if (label.includes("kitchen")) {
     const rCenter = roomCenterPoint(t.room);
+
+    // Add centered ceiling fan exclusively for kitchen in Standard mode
+    add("elec_fan", center.x, center.y, "Fan");
 
     // --- 1. LIGHTS & FRIDGE (Attached to the Same Opposite Wall) ---
     let counterWall = null;
@@ -409,7 +414,7 @@ if (t.counters && t.counters.length > 0) {
     }
 
     // --- 4. SINK LIGHT & FAN ---
-    add("elec_fan", center.x, center.y, "Fan");
+    // Fan removed as requested
     t.sinks.forEach(sink => {
         add("elec_light", (sink.x1 + sink.x2) / 2, Math.min(sink.y1, sink.y2) + 5, "Sink Light");
     });
@@ -542,13 +547,43 @@ function drawExhaustSymbol(x, y) {
   pctx.shadowBlur = 0;
 }
 
+function drawFanSymbol(x, y) {
+  pctx.shadowBlur = 6;
+  pctx.shadowColor = "#3B82F6";
+
+  pctx.strokeStyle = "#3B82F6";
+  pctx.lineWidth = 2;
+
+  pctx.beginPath();
+  pctx.arc(x, y, 10, 0, Math.PI * 2);
+  pctx.stroke();
+
+  pctx.beginPath();
+  pctx.moveTo(x, y);
+  pctx.lineTo(x, y - 8);
+  pctx.moveTo(x, y);
+  pctx.lineTo(x + 7, y + 4);
+  pctx.moveTo(x, y);
+  pctx.lineTo(x - 7, y + 4);
+  pctx.stroke();
+
+  pctx.shadowBlur = 0;
+}
+
 function drawElectrical(points) {
   for (const p of points) {
-    // ... your existing switch/light/exhaust drawing ...
-    if (p.type === "elec_light") drawLightSymbol(p.x, p.y);
-    if (p.type === "elec_switch") drawSwitchSymbol(p.x, p.y);
-    if (p.type === "elec_socket") drawSocketSymbol(p.x, p.y);
-    if (p.type === "elec_exhaust") drawExhaustSymbol(p.x, p.y);
+    if (window.selectedTemplate === "custom") {
+        if (p.type.includes("light")) drawLightSymbol(p.x, p.y);
+        else if (p.type.includes("switch")) drawSwitchSymbol(p.x, p.y);
+        else if (p.type.includes("socket")) drawSocketSymbol(p.x, p.y);
+        else if (p.type.includes("exhaust")) drawExhaustSymbol(p.x, p.y);
+        else if (p.type.includes("fan")) drawFanSymbol(p.x, p.y);
+    } else {
+        if (p.type === "elec_light") drawLightSymbol(p.x, p.y);
+        if (p.type === "elec_switch") drawSwitchSymbol(p.x, p.y);
+        if (p.type === "elec_socket") drawSocketSymbol(p.x, p.y);
+        if (p.type === "elec_exhaust") drawExhaustSymbol(p.x, p.y);
+    }
 
     // ✅ ADD LABELS (Understandable Way)
     if (p.label) {
@@ -579,7 +614,61 @@ function drawPreview() {
         pointsToDraw = generateElectrical(planObjects, selectedTemplate);
     }
 
+    
+    // NIGHT MODE SIMULATION OVERLAY
+    if (window.isNightMode) {
+        pctx.fillStyle = "rgba(10, 15, 30, 0.95)";
+        pctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+        
+        // Use 'screen' to beautifully blend light overlaps and brighten the dark floorplan underneath
+        pctx.globalCompositeOperation = "screen";
+        pointsToDraw.forEach(p => {
+            if (p.type.includes('light')) {
+                // Parse label to determine specific light type
+                const isSink = p.label && p.label.toLowerCase().includes('sink');
+                
+                // Sink lights are focused spotlights, Main lights are larger floodlights
+                const radius = isSink ? 110 : 160; 
+                const radgrad = pctx.createRadialGradient(p.x, p.y, 5, p.x, p.y, radius);
+                
+                if (isSink) {
+                    // Warm Ambient Sink Light (Reduced Intensity)
+                    radgrad.addColorStop(0, "rgba(255, 230, 150, 0.75)"); 
+                    radgrad.addColorStop(0.3, "rgba(255, 200, 100, 0.25)"); 
+                    radgrad.addColorStop(1, "rgba(255, 180, 50, 0)");
+                } else {
+                    // Crisp Daylight/White Main Light (Reduced Intensity)
+                    radgrad.addColorStop(0, "rgba(255, 255, 255, 0.75)"); 
+                    radgrad.addColorStop(0.3, "rgba(225, 235, 255, 0.25)"); 
+                    radgrad.addColorStop(1, "rgba(200, 220, 255, 0)");
+                }
+                
+                pctx.fillStyle = radgrad;
+                pctx.beginPath();
+                pctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                pctx.fill();
+            }
+        });
+        // Reset composite operation so CAD symbols draw normally on top
+        pctx.globalCompositeOperation = "source-over";
+    }
+
     drawElectrical(pointsToDraw);
+
+    // UX Enhancement: Display selected mode deeply on the canvas overlay
+    pctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+    pctx.font = "bold 16px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+    pctx.textAlign = "right";
+    
+    let modeLabel = "Cost Effective Layout";
+    if (selectedTemplate === "standard") modeLabel = "Standard Intelligent Layout";
+    if (selectedTemplate === "premium") modeLabel = "Premium Luxury Layout";
+    if (selectedTemplate === "custom") modeLabel = "Custom Designer Layout";
+    
+    pctx.shadowColor = "rgba(0,0,0,0.8)";
+    pctx.shadowBlur = 4;
+    pctx.fillText(modeLabel, previewCanvas.width - 20, 30);
+    pctx.shadowBlur = 0;
 }
 
 // ============================
@@ -611,6 +700,22 @@ function selectTemplate(mode) {
 
 function previewOnly() {
   drawPreview();
+}
+
+window.isNightMode = false;
+function toggleNightMode() {
+    window.isNightMode = !window.isNightMode;
+    const btn = document.getElementById("nightModeBtn");
+    if (window.isNightMode) {
+        btn.style.background = "var(--success-neon)";
+        btn.style.color = "#000";
+        btn.innerHTML = "☀️ Return to Day Mode";
+    } else {
+        btn.style.background = "rgba(30, 41, 59, 0.8)";
+        btn.style.color = "#fff";
+        btn.innerHTML = "🌙 Simulate Lights";
+    }
+    drawPreview();
 }
 
 async function applySelectedTemplate() {
@@ -653,8 +758,8 @@ function setActiveTool(tool) {
   }
 }
 
-// Make sure these are available to the HTML
 window.selectTemplate = selectTemplate;
 window.setActiveTool = setActiveTool;
 window.applySelectedTemplate = applySelectedTemplate;
+window.toggleNightMode = toggleNightMode;
 loadPlan();

@@ -39,24 +39,6 @@ function drawLabel(text, x, y, color) {
     ctx.shadowBlur = 0; 
 }
 
-function render() {
-    drawGrid();
-    drawArchitecture();
-
-    const topology = buildRoomTopology(planObjects);
-    const points = planObjects.filter(o => String(o.type).startsWith("elec_"));
-    
-    topology.forEach(roomT => {
-        const roomPoints = points.filter(p => isInside(p.x, p.y, roomT.room));
-        if (roomPoints.length > 0) {
-            drawRoomWiring(roomPoints, roomT.walls, roomT.room);
-        }
-    });
-
-    // Pass the selectedMode to the BOM engine
-    updateBOM(points, topology, selectedMode);
-}
-
 function resize() {
     canvas.width = canvas.parentElement.clientWidth;
     canvas.height = canvas.parentElement.clientHeight;
@@ -71,8 +53,26 @@ function render() {
 
     // Build Topology to understand rooms and walls
     const topology = buildRoomTopology(planObjects);
-    const points = planObjects.filter(o => String(o.type).startsWith("elec_"));
+    let points = planObjects.filter(o => String(o.type).startsWith("elec_"));
     
+    // Globally Purge any secondary "wall-attached" fans so ONLY the true central Hub remains per room!
+    // This stops rogue fans from being drawn as appliances and removes them from the BOM.
+    topology.forEach(roomT => {
+        const roomFans = points.filter(f => f.type.includes('fan') && isInside(f.x, f.y, roomT.room));
+        if (roomFans.length > 1) {
+            const rCx = (roomT.room.x1 + roomT.room.x2) / 2;
+            const rCy = (roomT.room.y1 + roomT.room.y2) / 2;
+            // Find the perfect center fan
+            const hubFan = roomFans.reduce((closest, curr) => {
+                const d1 = Math.hypot(closest.x - rCx, closest.y - rCy);
+                const d2 = Math.hypot(curr.x - rCx, curr.y - rCy);
+                return (d2 < d1) ? curr : closest;
+            });
+            // Filter OUT any fan in this room that isn't the true hubFan
+            points = points.filter(p => !roomFans.includes(p) || p === hubFan);
+        }
+    });
+
     // Process each room individually
     topology.forEach(roomT => {
         const roomPoints = points.filter(p => isInside(p.x, p.y, roomT.room));
@@ -82,7 +82,23 @@ function render() {
     });
 
     // Calculate and display the Bill of Materials
-    updateBOM(points, topology);
+    updateBOM(points, topology, typeof selectedMode !== 'undefined' ? selectedMode : 'cost');
+
+    // UX Enhancement: Display active mode overlay on canvas
+    ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+    ctx.font = "bold 16px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+    ctx.textAlign = "right";
+    let modeRaw = typeof selectedMode !== 'undefined' ? selectedMode : "cost";
+    
+    let modeLabel = "Cost Effective Layout";
+    if (modeRaw === "standard") modeLabel = "Standard Intelligent Layout";
+    if (modeRaw === "premium") modeLabel = "Premium Luxury Layout";
+    if (modeRaw === "custom") modeLabel = "Custom Designer Layout";
+    
+    ctx.shadowColor = "rgba(0,0,0,0.8)";
+    ctx.shadowBlur = 4;
+    ctx.fillText(modeLabel + " Wiring", canvas.width - 20, 30);
+    ctx.shadowBlur = 0;
 }
 
 /**
@@ -90,7 +106,17 @@ function render() {
  */
 function drawRoomWiring(points, walls, room) {
     const mb = points.find(p => p.type.includes('switch'));
-    const fan = points.find(p => p.type.includes('fan'));
+    
+    // Mathematically find the fan closest to the perfect geometric center of the room to act as the primary Hub
+    const fans = points.filter(p => p.type.includes('fan'));
+    const rCx = (room.x1 + room.x2) / 2;
+    const rCy = (room.y1 + room.y2) / 2;
+    const fan = fans.length > 0 ? fans.reduce((closest, curr) => {
+        const d1 = Math.hypot(closest.x - rCx, closest.y - rCy);
+        const d2 = Math.hypot(curr.x - rCx, curr.y - rCy);
+        return (d2 < d1) ? curr : closest;
+    }, fans[0]) : null;
+
     if (!mb || !fan) return;
 
     // --- MAIN FEED ---
@@ -119,7 +145,7 @@ function drawRoomWiring(points, walls, room) {
             // Check if we need an extra junction box nearby
             if (fanOutletsUsed >= 4) {
                 // Visually show a second junction box or a "Loop"
-                drawLabel("ADDL J-BOX REQ", fan.x + 15, fan.y + 15, "#94a3b8");
+                drawLabel("ADDL J-BOX REQ", fan.x, fan.y + 20, "#94a3b8");
             }
 
             const path = calculateRealWorldPath(fan, p, walls, room);
@@ -257,8 +283,8 @@ function calculateTotalLoad(points) {
 function updateBOM(points, topology, mode = 'cost') {
     let conduitMtrs = 0;
     const mb = points.find(p => p.type.includes('switch'));
-    const fan = points.find(p => p.type.includes('fan'));
-    if (!mb || !fan) return;
+    const globalFan = points.find(p => p.type.includes('fan'));
+    if (!mb || !globalFan) return;
 
     // --- 1. LOAD CALCULATION SPECS ---
     const loadSpecs = {
@@ -273,6 +299,7 @@ function updateBOM(points, topology, mode = 'cost') {
 
     let totalWatts = 0;
     let highLoadDetected = false;
+    let highLoadConduitMtrs = 0;
 
     // --- 2. PRICING & MATERIALS ---
     const pricing = {
@@ -293,17 +320,47 @@ function updateBOM(points, topology, mode = 'cost') {
         totalWatts += watts;
         if (watts > 1000) highLoadDetected = true;
 
-        if (p === mb) return;
+        const labelText = (p.label || p.type.replace('elec_', '')).toUpperCase();
+        
         const roomT = topology.find(t => isInside(p.x, p.y, t.room));
         if (!roomT) return;
+        
+        // Find the specific Switchboard/Mainboard for THIS room (Defaulting to house global if none)
+        const roomSwitches = points.filter(s => s.type.includes('switch') && isInside(s.x, s.y, roomT.room));
+        const roomMB = roomSwitches.length > 0 ? roomSwitches[0] : mb;
 
-        // Path Calculation (Conduit)
-        if (isPointOnSameWall(p, mb, roomT.walls) && p.type.includes('light')) {
+        if (p === roomMB) return; // Prevent looping to itself
+
+        // Get this specific room's valid hub (the fan closest to the center)
+        const roomFans = points.filter(f => f.type.includes('fan') && isInside(f.x, f.y, roomT.room));
+        const rCx = (roomT.room.x1 + roomT.room.x2) / 2;
+        const rCy = (roomT.room.y1 + roomT.room.y2) / 2;
+        const roomFan = roomFans.length > 0 ? roomFans.reduce((closest, curr) => {
+            const d1 = Math.hypot(closest.x - rCx, closest.y - rCy);
+            const d2 = Math.hypot(curr.x - rCx, curr.y - rCy);
+            return (d2 < d1) ? curr : closest;
+        }, roomFans[0]) : globalFan; // fallback just in case
+
+        // --- PRECISE PATH CALCULATION (Matching Visual Engine) ---
+        let pathDist = 0;
+        
+        if (labelText.includes("FRIDGE") || labelText.includes("OVEN") || watts >= 1000) {
+            // Heavy Loads route DIRECTLY to the Main Board bypassing the Fan Hub
+            const path = calculateRealWorldPath(roomMB, p, roomT.walls, roomT.room);
+            pathDist = (getPathDist(path) * 0.05) + 1.8;
+            conduitMtrs += pathDist;
+            highLoadDetected = true;
+            highLoadConduitMtrs += pathDist; 
+        }
+        else if (isPointOnSameWall(p, roomMB, roomT.walls) && p.type.includes('light')) {
+            // Basic nearby wall light
             conduitMtrs += 1.2;
-        } else if (p === fan) {
-            conduitMtrs += (Math.hypot(fan.x - mb.x, fan.y - mb.y) * 0.05);
+        } else if (p.type.includes('fan')) {
+            // The Main Feed (Room MB -> Room Hub Fan)
+            conduitMtrs += (Math.hypot(roomFan.x - roomMB.x, roomFan.y - roomMB.y) * 0.05);
         } else {
-            const path = calculateRealWorldPath(fan, p, roomT.walls, roomT.room);
+            // Standard Appliances route specifically through the Room Hub Fan
+            const path = calculateRealWorldPath(roomFan, p, roomT.walls, roomT.room);
             conduitMtrs += (getPathDist(path) * 0.05) + 1.8;
         }
     });
@@ -327,8 +384,8 @@ function updateBOM(points, topology, mode = 'cost') {
         { name: "20mm PVC Conduit (Light Gauge)", qty: Math.ceil(conduitMtrs) + " m", rate: pricing.conduit },
         { name: "1.0 sqmm FR Wire (Lighting)", qty: totalWireMtrs + " m", rate: pricing.wire1_0 },
         
-        // Add Heavy Wire if High Load detected
-        ...(highLoadDetected ? [{ name: "2.5 sqmm FR Wire (Power Circuits)", qty: "45 m", rate: pricing.wire2_5 }] : []),
+        // Add computationally exact Heavy Wire if High Load detected
+        ...(highLoadDetected ? [{ name: "2.5 sqmm FR Wire (Power Circuits)", qty: Math.max(10, Math.ceil((highLoadConduitMtrs * 3) * 1.05)) + " m", rate: pricing.wire2_5 }] : []),
         
         { name: "PVC Deep Junction Boxes", qty: points.length + " nos", rate: pricing.junctionBox },
         { name: "Modular Switches/Sockets", qty: (switchCount + socketCount) + " nos", rate: pricing.switch },
