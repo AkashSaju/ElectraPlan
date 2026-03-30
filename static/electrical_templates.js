@@ -570,8 +570,58 @@ function drawFanSymbol(x, y) {
   pctx.shadowBlur = 0;
 }
 
+// ============================
+// POP-IN ANIMATION ENGINE
+// ============================
+// Tracks animation state per-point id:  { scale, startTime }
+window._animStates = {};
+const ANIM_DURATION = 450; // ms total for full bounce
+
+// Easing: elastic overshoot — snaps past 1.0 then settles
+function easeOutElastic(t) {
+    const c4 = (2 * Math.PI) / 3;
+    return t === 0 ? 0 : t === 1 ? 1
+        : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+}
+
+// Called when template changes or item placed — seeds fresh animation
+function triggerPopIn(points) {
+    const now = performance.now();
+    points.forEach((p, i) => {
+        // Stagger each component by 30ms so they cascade in rather than all at once
+        window._animStates[p.id] = { startTime: now + i * 30, done: false };
+    });
+}
+
+// Checks if at least one point is still animating
+function isAnimating() {
+    const now = performance.now();
+    return Object.values(window._animStates).some(s => !s.done && now < s.startTime + ANIM_DURATION + 100);
+}
+
+function getScale(p) {
+    const state = window._animStates[p.id];
+    if (!state) return 1; // fully rendered, no animation
+    const now = performance.now();
+    const elapsed = now - state.startTime;
+    if (elapsed < 0) return 0;  // not started yet (stagger delay)
+    if (elapsed >= ANIM_DURATION) { state.done = true; return 1; }
+    return easeOutElastic(elapsed / ANIM_DURATION);
+}
+
 function drawElectrical(points) {
   for (const p of points) {
+    const scale = getScale(p);
+    if (scale <= 0) continue; // not yet visible during stagger
+
+    // Apply scale transform centered on the point
+    pctx.save();
+    pctx.translate(p.x, p.y);
+    pctx.scale(scale, scale);
+    pctx.translate(-p.x, -p.y);
+
+    pctx.globalAlpha = Math.min(1, scale);
+
     if (window.selectedTemplate === "custom") {
         if (p.type.includes("light")) drawLightSymbol(p.x, p.y);
         else if (p.type.includes("switch")) drawSwitchSymbol(p.x, p.y);
@@ -583,15 +633,19 @@ function drawElectrical(points) {
         if (p.type === "elec_switch") drawSwitchSymbol(p.x, p.y);
         if (p.type === "elec_socket") drawSocketSymbol(p.x, p.y);
         if (p.type === "elec_exhaust") drawExhaustSymbol(p.x, p.y);
+        if (p.type === "elec_fan") drawFanSymbol(p.x, p.y);
     }
 
-    // ✅ ADD LABELS (Understandable Way)
-    if (p.label) {
+    pctx.restore();
+    pctx.globalAlpha = 1;
+
+    // Labels draw at full opacity after component appears
+    if (p.label && scale > 0.5) {
       pctx.shadowBlur = 0;
-      pctx.fillStyle = "#E5E7EB";
+      pctx.fillStyle = `rgba(229, 231, 235, ${Math.min(1, (scale - 0.5) * 2)})`;
       pctx.font = "bold 10px Segoe UI";
       pctx.textAlign = "center";
-      pctx.fillText(p.label, p.x, p.y - 18); // Place text above symbol
+      pctx.fillText(p.label, p.x, p.y - 18);
     }
   }
 }
@@ -669,6 +723,9 @@ function drawPreview() {
     pctx.shadowBlur = 4;
     pctx.fillText(modeLabel, previewCanvas.width - 20, 30);
     pctx.shadowBlur = 0;
+
+    // Draw wall hover highlight if Elevation Mode is active
+    if (typeof drawElevationHoverHighlight === 'function') drawElevationHoverHighlight();
 }
 
 // ============================
@@ -686,16 +743,28 @@ async function loadPlan() {
 
 function selectTemplate(mode) {
     window.selectedTemplate = mode;
+    window._animStates = {}; // Reset all animation states on template switch
     
     const toolbox = document.getElementById('customToolsPanel');
     if (mode === 'custom') {
         toolbox.style.display = 'block';
-        // Now passing objects directly to CustomModule
         CustomModule.init(planObjects); 
     } else {
         toolbox.style.display = 'none';
     }
-    drawPreview();
+
+    // Seed pop-in animation for the newly generated points
+    const pts = mode === 'custom' && typeof CustomModule !== 'undefined'
+        ? CustomModule.getPoints()
+        : generateElectrical(planObjects, mode);
+    triggerPopIn(pts);
+
+    // Run the animation loop until all components have settled
+    function animLoop() {
+        drawPreview();
+        if (isAnimating()) requestAnimationFrame(animLoop);
+    }
+    animLoop();
 }
 
 function previewOnly() {
@@ -762,4 +831,298 @@ window.selectTemplate = selectTemplate;
 window.setActiveTool = setActiveTool;
 window.applySelectedTemplate = applySelectedTemplate;
 window.toggleNightMode = toggleNightMode;
+
+// ============================
+// WALL ELEVATION VIEW ENGINE
+// ============================
+window.isElevationMode = false;
+let _elevHoverWall = null; // The wall currently under mouse
+
+function toggleElevationMode() {
+    window.isElevationMode = !window.isElevationMode;
+    const btn = document.getElementById('elevBtn');
+    const canvas = document.getElementById('previewCanvas');
+
+    if (window.isElevationMode) {
+        btn.style.background = '#a78bfa';
+        btn.style.color = '#000';
+        btn.innerHTML = '🧱 Click a Wall…';
+        canvas.classList.add('elevation-mode');
+    } else {
+        btn.style.background = 'rgba(30, 41, 59, 0.8)';
+        btn.style.color = '#a78bfa';
+        btn.innerHTML = '🧱 Wall Elevation';
+        canvas.classList.remove('elevation-mode');
+        _elevHoverWall = null;
+        drawPreview(); // Clean up any hover highlight
+    }
+}
+
+function closeElevation() {
+    document.getElementById('elevationModal').classList.remove('open');
+    window.isElevationMode = false;
+    toggleElevationMode(); // Reset button state cleanly
+}
+
+// Returns the nearest wall object and its distance to a point
+function findNearestWallToPoint(px, py, walls) {
+    let nearest = null, nearestDist = Infinity;
+    walls.forEach(w => {
+        // Project point onto wall segment
+        const dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+        const len2 = dx*dx + dy*dy;
+        let t = len2 > 0 ? ((px - w.x1)*dx + (py - w.y1)*dy) / len2 : 0;
+        t = Math.max(0, Math.min(1, t));
+        const cx = w.x1 + t*dx, cy = w.y1 + t*dy;
+        const dist = Math.hypot(px - cx, py - cy);
+        if (dist < nearestDist) { nearestDist = dist; nearest = w; }
+    });
+    return { wall: nearest, dist: nearestDist };
+}
+
+// Hook canvas mousemove for wall hover highlight in elevation mode
+previewCanvas.addEventListener('mousemove', (e) => {
+    if (!window.isElevationMode) return;
+    const rect = previewCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const walls = planObjects.filter(o => o.type === 'wall');
+    if (walls.length === 0) return;
+
+    const { wall, dist } = findNearestWallToPoint(mx, my, walls);
+    if (dist < 35) {
+        _elevHoverWall = wall;
+    } else {
+        _elevHoverWall = null;
+    }
+    drawPreview(); // Redraw with hover highlight
+});
+
+// Hook canvas click to open elevation when in elevation mode
+previewCanvas.addEventListener('click', (e) => {
+    if (!window.isElevationMode) return;
+    const rect = previewCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const walls = planObjects.filter(o => o.type === 'wall');
+    if (walls.length === 0) return;
+
+    const { wall, dist } = findNearestWallToPoint(mx, my, walls);
+    if (dist < 50 && wall) {
+        drawElevation(wall);
+    }
+});
+
+// Called from drawPreview to overlay the hover highlight on canvas
+function drawElevationHoverHighlight() {
+    if (!window.isElevationMode || !_elevHoverWall) return;
+    const w = _elevHoverWall;
+    pctx.beginPath();
+    pctx.moveTo(w.x1, w.y1);
+    pctx.lineTo(w.x2, w.y2);
+    pctx.strokeStyle = '#a78bfa';
+    pctx.lineWidth = 5;
+    pctx.shadowColor = 'rgba(167, 139, 250, 0.8)';
+    pctx.shadowBlur = 14;
+    pctx.stroke();
+    pctx.shadowBlur = 0;
+
+    // Tooltip hint
+    const mx = (w.x1 + w.x2) / 2, my = (w.y1 + w.y2) / 2;
+    pctx.fillStyle = 'rgba(167, 139, 250, 0.9)';
+    pctx.font = 'bold 11px Inter, sans-serif';
+    pctx.textAlign = 'center';
+    pctx.fillText('Click to view elevation ↑', mx, my - 12);
+}
+
+/**
+ * THE ELEVATION DRAWING ENGINE
+ * Renders a professional 2D front-face wall elevation with components at real mounting heights.
+ */
+function drawElevation(wall) {
+    const modal = document.getElementById('elevationModal');
+    const ec = document.getElementById('elevationCanvas');
+    const label = document.getElementById('elevWallLabel');
+
+    modal.classList.add('open');
+
+    // Determine wall geometry
+    const wallLenPx = Math.hypot(wall.x2 - wall.x1, wall.y2 - wall.y1);
+    const wallLenM  = (wallLenPx / 40).toFixed(1); // 40px = 1 meter
+
+    label.textContent = `Wall Length: ${wallLenM} m  ·  Click any wall on the floor plan to switch view`;
+
+    // Set canvas size to match panel
+    ec.width  = ec.offsetWidth || 800;
+    ec.height = 320;
+    const ctx2 = ec.getContext('2d');
+
+    // ---- CONSTANTS ----
+    const ROOM_HEIGHT_M  = 2.75; // Standard Kerala room height
+    const PAD_L = 50, PAD_R = 30, PAD_T = 30, PAD_B = 50;
+    const drawW = ec.width  - PAD_L - PAD_R;
+    const drawH = ec.height - PAD_T - PAD_B;
+
+    // Scale: pixels per meter
+    const scaleX = drawW / parseFloat(wallLenM);
+    const scaleY = drawH / ROOM_HEIGHT_M;
+
+    // Helper: converts real-world position along wall and height to canvas coords
+    const toCanvasX = (mFromLeft) => PAD_L + mFromLeft * scaleX;
+    const toCanvasY = (mFromFloor) => PAD_T + drawH - mFromFloor * scaleY;
+
+    // Background
+    ctx2.fillStyle = '#060d1a';
+    ctx2.fillRect(0, 0, ec.width, ec.height);
+
+    // --- WALL FACE (brick-like texture) ---
+    ctx2.fillStyle = '#1e293b';
+    ctx2.strokeStyle = 'rgba(34,211,238,0.3)';
+    ctx2.lineWidth = 1;
+    ctx2.fillRect(PAD_L, PAD_T, drawW, drawH);
+    ctx2.strokeRect(PAD_L, PAD_T, drawW, drawH);
+
+    // Subtle brick rows
+    ctx2.strokeStyle = 'rgba(255,255,255,0.04)';
+    for (let row = 0; row < 8; row++) {
+        const y = PAD_T + (drawH / 8) * row;
+        ctx2.beginPath(); ctx2.moveTo(PAD_L, y); ctx2.lineTo(PAD_L + drawW, y); ctx2.stroke();
+    }
+    for (let col = 0; col < 12; col++) {
+        const x = PAD_L + (drawW / 12) * col;
+        ctx2.beginPath(); ctx2.moveTo(x, PAD_T); ctx2.lineTo(x, PAD_T + drawH); ctx2.stroke();
+    }
+
+    // --- FLOOR & CEILING LINES ---
+    ctx2.strokeStyle = '#a78bfa';
+    ctx2.lineWidth = 2;
+    ctx2.setLineDash([]);
+    // Floor
+    ctx2.beginPath(); ctx2.moveTo(PAD_L, toCanvasY(0)); ctx2.lineTo(PAD_L + drawW, toCanvasY(0)); ctx2.stroke();
+    // Ceiling
+    ctx2.beginPath(); ctx2.moveTo(PAD_L, toCanvasY(ROOM_HEIGHT_M)); ctx2.lineTo(PAD_L + drawW, toCanvasY(ROOM_HEIGHT_M)); ctx2.stroke();
+
+    // --- HEIGHT LABELS (left axis) ---
+    ctx2.fillStyle = '#64748b';
+    ctx2.font = '10px Inter, sans-serif';
+    ctx2.textAlign = 'right';
+    [0, 0.5, 1.0, 1.2, 1.4, 2.0, ROOM_HEIGHT_M].forEach(h => {
+        const cy = toCanvasY(h);
+        ctx2.beginPath();
+        ctx2.moveTo(PAD_L - 6, cy); ctx2.lineTo(PAD_L, cy);
+        ctx2.strokeStyle = 'rgba(100,116,139,0.5)';
+        ctx2.lineWidth = 1;
+        ctx2.stroke();
+        ctx2.fillText(`${h}m`, PAD_L - 8, cy + 4);
+    });
+
+    // --- FIND COMPONENTS ON THIS WALL ---
+    const allPoints = selectedTemplate === 'custom' && typeof CustomModule !== 'undefined'
+        ? CustomModule.getPoints()
+        : generateElectrical(planObjects, selectedTemplate);
+
+    // A component belongs to this wall if it's within 40px of the wall line
+    const wallDx = wall.x2 - wall.x1, wallDy = wall.y2 - wall.y1;
+    const wallLen2 = wallDx*wallDx + wallDy*wallDy;
+
+    const onWallComponents = allPoints.filter(p => {
+        if (wallLen2 === 0) return false;
+        let t = ((p.x - wall.x1)*wallDx + (p.y - wall.y1)*wallDy) / wallLen2;
+        t = Math.max(0, Math.min(1, t));
+        const cx = wall.x1 + t*wallDx, cy = wall.y1 + t*wallDy;
+        return Math.hypot(p.x - cx, p.y - cy) < 40;
+    });
+
+    // --- MOUNTING HEIGHT MAP ---
+    const MOUNT_HEIGHTS = {
+        elec_switch:        1.40,
+        elec_light:         ROOM_HEIGHT_M - 0.05,
+        elec_fan:           ROOM_HEIGHT_M - 0.15,
+        elec_socket:        1.20,
+        elec_socket_fridge: 0.50,
+        elec_socket_mixi:   1.00,
+        elec_socket_oven:   0.80,
+        elec_socket_water:  1.80,
+        elec_exhaust:       ROOM_HEIGHT_M - 0.30,
+    };
+
+    const COMP_COLORS = {
+        elec_switch:        '#eab308',
+        elec_light:         '#fde68a',
+        elec_fan:           '#38bdf8',
+        elec_socket:        '#3b82f6',
+        elec_socket_fridge: '#3b82f6',
+        elec_socket_mixi:   '#3b82f6',
+        elec_socket_oven:   '#ef4444',
+        elec_socket_water:  '#ef4444',
+        elec_exhaust:       '#a3e635',
+    };
+
+    // Draw components on the elevation wall
+    onWallComponents.forEach(p => {
+        // Project where on the wall this component sits (0 = left end, wallLenM = right end)
+        let t = wallLen2 > 0 ? ((p.x - wall.x1)*wallDx + (p.y - wall.y1)*wallDy) / wallLen2 : 0.5;
+        t = Math.max(0.02, Math.min(0.98, t));
+        const posAlongWall = t * parseFloat(wallLenM);
+        const mountH = MOUNT_HEIGHTS[p.type] || 1.2;
+        const color  = COMP_COLORS[p.type]   || '#94a3b8';
+
+        const cx = toCanvasX(posAlongWall);
+        const cy = toCanvasY(mountH);
+
+        // Glow
+        ctx2.shadowColor = color;
+        ctx2.shadowBlur  = 12;
+
+        // Draw component face-plate
+        ctx2.fillStyle = color;
+        if (p.type.includes('fan') || p.type.includes('light')) {
+            // Circular ceiling mount
+            ctx2.beginPath();
+            ctx2.arc(cx, cy, 12, 0, Math.PI * 2);
+            ctx2.fill();
+        } else {
+            // Rectangular wall box
+            ctx2.fillRect(cx - 10, cy - 8, 20, 16);
+        }
+        ctx2.shadowBlur = 0;
+
+        // Mounting height dashed line from floor
+        ctx2.setLineDash([3, 4]);
+        ctx2.strokeStyle = `${color}55`;
+        ctx2.lineWidth = 1;
+        ctx2.beginPath();
+        ctx2.moveTo(cx, toCanvasY(0));
+        ctx2.lineTo(cx, cy);
+        ctx2.stroke();
+        ctx2.setLineDash([]);
+
+        // Label
+        const lbl = (p.label || p.type.replace('elec_','').replace('socket_','')).toUpperCase();
+        ctx2.fillStyle = '#f8fafc';
+        ctx2.font = 'bold 9px Inter, sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.fillText(lbl, cx, cy + (p.type.includes('fan') || p.type.includes('light') ? 22 : 20));
+        ctx2.fillStyle = color;
+        ctx2.fillText(`${mountH.toFixed(1)}m`, cx, cy - (p.type.includes('fan') || p.type.includes('light') ? 18 : 14));
+    });
+
+    // "No components on this wall" message
+    if (onWallComponents.length === 0) {
+        ctx2.fillStyle = '#334155';
+        ctx2.font = '13px Inter, sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.fillText('No electrical components found on this wall', ec.width / 2, ec.height / 2);
+    }
+
+    // Wall length dimension at the bottom
+    ctx2.fillStyle = '#a78bfa';
+    ctx2.font = 'bold 11px Inter, sans-serif';
+    ctx2.textAlign = 'center';
+    ctx2.fillText(`← ${wallLenM} m →`, PAD_L + drawW / 2, toCanvasY(0) + 30);
+}
+
+window.toggleElevationMode = toggleElevationMode;
+window.closeElevation = closeElevation;
+window.drawElevationHoverHighlight = drawElevationHoverHighlight;
+
 loadPlan();
+

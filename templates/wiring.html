@@ -130,6 +130,50 @@
             .wiring-grid { transform: scale(1); display: block; }
             .secondary, .primary { display: none; }
         }
+
+        /* --- LOAD REPORT MODAL --- */
+        #loadReportModal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(2, 6, 23, 0.88);
+            backdrop-filter: blur(12px);
+            z-index: 9999; align-items: center; justify-content: center;
+        }
+        #loadReportModal.open { display: flex; }
+        .load-panel {
+            background: #0f172a; border: 1px solid #f97316;
+            border-radius: 24px; padding: 28px;
+            width: 88vw; max-width: 900px;
+            box-shadow: 0 0 60px rgba(249,115,22,0.12);
+            animation: lrSlideIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes lrSlideIn {
+            from { transform: scale(0.88) translateY(20px); opacity: 0; }
+            to   { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .circuit-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 20px; }
+        .circuit-card {
+            background: rgba(255,255,255,0.03); border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.07); padding: 14px;
+            text-align: center;
+        }
+        .circuit-title { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 6px; }
+        .circuit-stat { font-size: 20px; font-weight: 800; margin: 4px 0; }
+        .circuit-sub  { font-size: 10px; color: #64748b; }
+        .mcb-badge {
+            display: inline-block; padding: 3px 10px;
+            border-radius: 20px; font-size: 10px; font-weight: 700;
+            margin-top: 7px;
+        }
+        .items-list { margin-top: 10px; text-align: left; }
+        .item-row {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: #94a3b8;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .item-row:last-child { border-bottom: none; }
+        .item-row .item-name { color: #e2e8f0; }
+        .item-row .item-w    { font-weight: 700; }
     </style>
 </head>
 <body>
@@ -141,9 +185,22 @@
                 <h2 style="margin:0; font-size: 18px; font-weight: 800;">Wiring Analysis</h2>
                 <span style="color: var(--electra-blue); font-size: 10px; text-transform: uppercase; font-weight: 600;">ID: {{ plan_id }}</span>
             </div>
-            <div style="font-size: 11px; color: var(--text-dim); text-align: right;">
-                Hub-and-Spoke Topology<br>
-                <span style="color: var(--success-neon);">Ready for Export</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="heatmapBtn" onclick="toggleHeatmap()" style="width: auto; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; background: rgba(30,41,59,0.8); border: 1px solid #f97316; color: #f97316; transition: all 0.3s; box-shadow: 0 0 10px rgba(249,115,22,0.2);">
+                    🔥 Heatmap OFF
+                </button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                <button id="dimBtn" onclick="toggleDimensions()" style="width:auto; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; background:rgba(30,41,59,0.8); border:1px solid #a78bfa; color:#a78bfa; transition:all 0.3s; box-shadow:0 0 8px rgba(167,139,250,0.15);">
+                    📐 Dimensions
+                </button>
+                <button id="loadRptBtn" onclick="toggleLoadReport()" style="width:auto; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:700; background:rgba(30,41,59,0.8); border:1px solid #f97316; color:#f97316; transition:all 0.3s; box-shadow:0 0 8px rgba(249,115,22,0.15);">
+                    📊 Load Report
+                </button>
+                <div style="font-size: 11px; color: var(--text-dim); text-align: right;">
+                    Hub-and-Spoke Topology<br>
+                    <span style="color: var(--success-neon);">Ready for Export</span>
+                </div>
+            </div>
             </div>
         </header>
         <canvas id="wiringCanvas"></canvas>
@@ -155,7 +212,7 @@
         <div class="table-container">
             <table class="bom-table">
                 <thead>
-                    <tr><th>Item Description</th><th style="text-align: right;">Qty</th></tr>
+                    <tr><th>Item Description</th><th style="text-align: center;">Qty</th><th style="text-align: right;">Total</th></tr>
                 </thead>
                 <tbody id="bomBody">
                     </tbody>
@@ -163,7 +220,7 @@
         </div>
 
         <footer class="bottom-section">
-            <div class="legend">
+            <div class="legend" id="wiringLegend">
                 <div class="legend-item"><div class="line" style="background: #EF4444;"></div> Feed</div>
                 <div class="legend-item"><div class="line" style="border: 1px dashed #EF4444;"></div> Load</div>
                 <div class="legend-item"><div class="line" style="background: #FACC15;"></div> Std</div>
@@ -184,6 +241,89 @@
 <script>window.PLAN_ID = "{{ plan_id }}";</script>
 <script src="/static/room_topology_engine.js"></script>
 <script src="/static/wiring_logic.js"></script>
+
+<!-- LOAD BALANCE REPORT MODAL -->
+<div id="loadReportModal">
+  <div class="load-panel">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-weight:800; font-size:17px; color:#f97316;">📊 Circuit Load Balance Report</div>
+        <div style="font-size:12px; color:#64748b; margin-top:3px;">Kerala Standard Single-Phase 230V — 5-Circuit Panel Distribution</div>
+      </div>
+      <button onclick="document.getElementById('loadReportModal').classList.remove('open')" style="background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); color:#ef4444; padding:6px 14px; border-radius:10px; cursor:pointer; font-weight:700;">✕ Close</button>
+    </div>
+
+    <div class="circuit-grid">
+
+      <!-- C1: Lighting -->
+      <div class="circuit-card">
+        <div class="circuit-title" style="color:#fde68a;">💡 Lighting</div>
+        <canvas id="gauge-lighting" width="80" height="50"></canvas>
+        <div id="stat-lighting" class="circuit-stat" style="color:#fde68a;">—</div>
+        <div id="amp-lighting" class="circuit-sub">0.0 A</div>
+        <div id="mcb-lighting" class="mcb-badge">—</div>
+        <div id="items-lighting" class="items-list"></div>
+      </div>
+
+      <!-- C2: Ventilation (Fans) -->
+      <div class="circuit-card">
+        <div class="circuit-title" style="color:#38bdf8;">🌀 Ventilation</div>
+        <canvas id="gauge-vent" width="80" height="50"></canvas>
+        <div id="stat-vent" class="circuit-stat" style="color:#38bdf8;">—</div>
+        <div id="amp-vent" class="circuit-sub">0.0 A</div>
+        <div id="mcb-vent" class="mcb-badge">—</div>
+        <div id="items-vent" class="items-list"></div>
+      </div>
+
+      <!-- C3: Refrigeration (Fridge) -->
+      <div class="circuit-card">
+        <div class="circuit-title" style="color:#22d3ee;">❄️ Refrigeration</div>
+        <canvas id="gauge-fridge" width="80" height="50"></canvas>
+        <div id="stat-fridge" class="circuit-stat" style="color:#22d3ee;">—</div>
+        <div id="amp-fridge" class="circuit-sub">0.0 A</div>
+        <div id="mcb-fridge" class="mcb-badge">—</div>
+        <div id="items-fridge" class="items-list"></div>
+      </div>
+
+      <!-- C4: Cooking (Oven, Mixi) -->
+      <div class="circuit-card">
+        <div class="circuit-title" style="color:#f97316;">🍳 Cooking</div>
+        <canvas id="gauge-cooking" width="80" height="50"></canvas>
+        <div id="stat-cooking" class="circuit-stat" style="color:#f97316;">—</div>
+        <div id="amp-cooking" class="circuit-sub">0.0 A</div>
+        <div id="mcb-cooking" class="mcb-badge">—</div>
+        <div id="items-cooking" class="items-list"></div>
+      </div>
+
+      <!-- C5: Utility (Water Heater) -->
+      <div class="circuit-card">
+        <div class="circuit-title" style="color:#ef4444;">🚿 Utility</div>
+        <canvas id="gauge-utility" width="80" height="50"></canvas>
+        <div id="stat-utility" class="circuit-stat" style="color:#ef4444;">—</div>
+        <div id="amp-utility" class="circuit-sub">0.0 A</div>
+        <div id="mcb-utility" class="mcb-badge">—</div>
+        <div id="items-utility" class="items-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Summary bar -->
+    <div style="margin-top:16px; padding:14px 20px; background:rgba(249,115,22,0.05); border-radius:14px; border:1px solid rgba(249,115,22,0.2); display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="font-size:10px; color:#f97316; text-transform:uppercase; font-weight:800; letter-spacing:1px;">Total Connected Load</div>
+        <div id="lr-total" style="font-size:26px; font-weight:800; color:#fff;">0 kW</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:10px; color:#64748b; text-transform:uppercase;">Demand Current</div>
+        <div id="lr-demand" style="font-size:20px; font-weight:800; color:#a3e635;">0.0 A</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px; color:#64748b; text-transform:uppercase;">Main Incomer MCB</div>
+        <div id="lr-mcb" style="font-size:20px; font-weight:800; color:#ef4444;">—</div>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

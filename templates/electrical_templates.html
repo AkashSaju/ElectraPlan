@@ -311,6 +311,62 @@
     .secondary:hover { border-color: #fff; color: #fff; }
 
     .delete-btn { width: 100%; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px; font-size: 11px; border-radius: 8px; cursor: pointer; }
+    /* --- WALL ELEVATION MODAL --- */
+    #elevationModal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(2, 6, 23, 0.85);
+        backdrop-filter: blur(10px);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+    }
+    #elevationModal.open { display: flex; }
+
+    .elev-panel {
+        background: #0f172a;
+        border: 1px solid var(--electra-blue);
+        border-radius: 24px;
+        padding: 28px;
+        width: 80vw;
+        max-width: 860px;
+        box-shadow: 0 0 60px rgba(34,211,238,0.15);
+        animation: elevSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes elevSlideIn {
+        from { transform: scale(0.85) translateY(30px); opacity: 0; }
+        to   { transform: scale(1)    translateY(0);    opacity: 1; }
+    }
+    #elevationCanvas {
+        width: 100%;
+        border-radius: 14px;
+        background: #060d1a;
+        border: 1px solid rgba(34,211,238,0.1);
+        margin-top: 16px;
+        display: block;
+    }
+    .elev-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .elev-close {
+        background: rgba(239,68,68,0.1);
+        border: 1px solid rgba(239,68,68,0.4);
+        color: #ef4444;
+        padding: 6px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 13px;
+        transition: 0.2s;
+    }
+    .elev-close:hover { background: rgba(239,68,68,0.25); }
+
+    /* Wall hover highlight cursor */
+    #previewCanvas.elevation-mode { cursor: crosshair; }
+
   </style>
 </head>
 
@@ -343,6 +399,9 @@
             <button onclick="toggleNightMode()" id="nightModeBtn" style="background: rgba(30, 41, 59, 0.8); border: 1px solid #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
                 🌙 Simulate Lights 
             </button>
+            <button onclick="toggleElevationMode()" id="elevBtn" style="background: rgba(30, 41, 59, 0.8); border: 1px solid #a78bfa; color: #a78bfa; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(167,139,250,0.2);">
+                🧱 Wall Elevation
+            </button>
             <div id="templateBadge" style="padding:6px 16px; border-radius: 999px; border: 1px solid var(--glass-border); font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--electra-blue); background: rgba(34,211,238,0.1);">
             </div>
         </div>
@@ -369,6 +428,26 @@
 
     <canvas id="previewCanvas"></canvas>
   </section>
+
+  <!-- WALL ELEVATION MODAL -->
+  <div id="elevationModal">
+    <div class="elev-panel">
+      <div class="elev-header">
+        <div>
+          <div style="font-weight: 800; font-size: 16px; color: #a78bfa;">🧱 Wall Elevation View</div>
+          <div id="elevWallLabel" style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Click a wall to inspect it</div>
+        </div>
+        <button class="elev-close" onclick="closeElevation()">✕ Close</button>
+      </div>
+      <canvas id="elevationCanvas" height="320"></canvas>
+      <div style="display: flex; gap: 24px; margin-top: 14px; font-size: 11px; color: var(--text-dim);">
+        <span>🟡 Switch — 1.4m</span>
+        <span>🔵 Socket — 1.2m</span>
+        <span>💡 Light — Ceiling</span>
+        <span>🌀 Fan — Ceiling Centre</span>
+      </div>
+    </div>
+  </div>
 
   <aside class="picker-panel">
     <div class="picker-title">Auto-Layout Engine</div>
