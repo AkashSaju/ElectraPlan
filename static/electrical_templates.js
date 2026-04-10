@@ -810,7 +810,7 @@ async function applySelectedTemplate() {
   });
 
   if (res.ok) {
-    window.location.href = `/wiring/${PLAN_ID}`;
+    window.location.href = `/wiring/${PLAN_ID}?mode=${selectedTemplate}`;
   } else {
     alert("Error saving. Please try again.");
   }

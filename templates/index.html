@@ -136,7 +136,10 @@
 
     <header class="hero">
         <div class="badge">Next-Gen v2.0</div>
-        <h1>Design Smarter.<br>Wire Faster.</h1>
+        <h1 class="glitch-title">
+            <span class="glitch-line" data-value="Design Smarter.">Design Smarter.</span><br>
+            <span class="glitch-line" data-value="Wire Faster.">Wire Faster.</span>
+        </h1>
         <p>The first automated hub-and-spoke electrical design engine for professional workstations.</p>
         <div style="display: flex; gap: 15px;">
             <a href="/register" class="btn btn-primary">Initialize Project</a>
@@ -202,6 +205,36 @@
             card.style.transform = 'translateY(30px)';
             card.style.transition = '0.8s ease-out';
             observer.observe(card);
+        });
+
+        // Cyberpunk Text Scramble Effect
+        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*";
+        
+        document.querySelectorAll('.glitch-line').forEach((element, i) => {
+            let iteration = 0;
+            let interval = null;
+            const originalText = element.dataset.value;
+            
+            // Stagger the second line slightly
+            setTimeout(() => {
+                interval = setInterval(() => {
+                    element.innerText = originalText
+                        .split("")
+                        .map((letter, index) => {
+                            if(index < iteration || letter === " ") {
+                                return originalText[index]; // Reveal actual letters or skip spaces
+                            }
+                            return letters[Math.floor(Math.random() * 42)];
+                        })
+                        .join("");
+                    
+                    if(iteration >= originalText.length){ 
+                        clearInterval(interval);
+                    }
+                    
+                    iteration += 1 / 3; // Controls speed of reveal
+                }, 35);
+            }, i * 300); // 300ms delay between lines
         });
     </script>
 </body>

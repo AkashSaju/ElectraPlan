@@ -61,8 +61,8 @@ init_db()
 @app.route("/")
 def index():
     if "user_id" in session:
-        
-        return render_template("index.html")
+        return redirect(url_for("dashboard"))
+    return render_template("index.html")
 
 @app.route("/register", methods=["GET", "POST"])
 def register():

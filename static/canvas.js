@@ -581,6 +581,60 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
+/* ---------------- CONTEXT MENU (UX) ---------------- */
+const contextMenu = document.getElementById('contextMenu');
+const cmRotate = document.getElementById('cm-rotate');
+
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const pos = getMouse(e);
+  const hit = findObject(pos.x, pos.y);
+  
+  if (hit) {
+    selectedObject = hit;
+    redraw();
+    
+    // Show/Hide specific actions based on object type
+    if (hit.type === 'door' || hit.type === 'window') {
+        cmRotate.style.display = 'flex';
+    } else {
+        cmRotate.style.display = 'none';
+    }
+
+    contextMenu.style.left = `${e.clientX}px`;
+    contextMenu.style.top = `${e.clientY}px`;
+    contextMenu.classList.add('open');
+  } else {
+    contextMenu.classList.remove('open');
+    selectedObject = null;
+    redraw();
+  }
+});
+
+// Hide context menu on normal click
+window.addEventListener("click", (e) => {
+    if (contextMenu && !contextMenu.contains(e.target)) {
+        contextMenu.classList.remove('open');
+    }
+});
+
+function handleCMRotate() {
+    if (!selectedObject) return;
+    if (selectedObject.type === "door") {
+        selectedObject.rotation = (selectedObject.rotation || 0) + 90;
+        if (selectedObject.rotation >= 360) selectedObject.rotation = 0;
+    } else if (selectedObject.type === "window") {
+        selectedObject.dir = selectedObject.dir === "H" ? "V" : "H";
+    }
+    contextMenu.classList.remove('open');
+    redraw();
+}
+
+function handleCMDelete() {
+    deleteSelected();
+    contextMenu.classList.remove('open');
+}
+
 window.addEventListener("keyup", (e) => {
   if (e.code === "Space") {
     spaceDown = false;

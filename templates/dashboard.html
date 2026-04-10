@@ -173,6 +173,14 @@
       justify-content: space-between;
       align-items: center;
       transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0;
+      transform: translateY(30px);
+      animation: bootUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes bootUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .plan-card:hover {
@@ -254,7 +262,12 @@
     </div>
     <span class="title">ELECTRA PLAN</span>
   </div>
-  <div class="actions"></div>
+  <div class="actions">
+    <span style="color: var(--text-muted); font-size: 13px; margin-right: 15px;">Operator: {{ username }}</span>
+    <a href="/logout" style="text-decoration:none;">
+      <button class="secondary" style="border-color: rgba(239, 68, 68, 0.4); color: #ef4444;">Log Out</button>
+    </a>
+  </div>
 </header>
 
   <main class="container">
@@ -270,7 +283,7 @@
 
    <div class="plans-grid">
   {% for plan in plans %}
-    <div class="plan-card">
+    <div class="plan-card" style="animation-delay: {{ loop.index0 * 0.08 }}s;">
       <div class="plan-main-info">
         <div class="plan-info-name">{{ plan.name }}</div>
         <div class="plan-info-id">ID: #{{ plan.id }}</div>

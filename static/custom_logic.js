@@ -4,11 +4,8 @@ const CustomModule = {
 
     // 1. Initialize Custom Mode
     init(objects) {
-        // Start by pre-populating with cost-effective logic so the user has a starting point
-        if (typeof generateElectrical === 'function') {
-            this.points = generateElectrical(objects, 'cost');
-        } else {
-            console.warn("generateElectrical is not found, cannot prepopulate points");
+        // Start with an empty canvas for true custom designing, but preserve if user returns
+        if (!this.points) {
             this.points = [];
         }
         

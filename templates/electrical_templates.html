@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Electra Plan - Electrical Intelligence</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  
+
   <style>
     /* --- ELECTRA SYSTEM VARIABLES --- */
     :root {
@@ -44,8 +45,18 @@
       z-index: 100;
     }
 
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .brand .title { font-weight: 800; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand .title {
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
 
     /* --- LAYOUT GRID --- */
     .app-container {
@@ -95,8 +106,17 @@
       backdrop-filter: blur(15px);
     }
 
-    .picker-title { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
-    .picker-sub { color: var(--text-dim); font-size:12px; margin-bottom: 24px; }
+    .picker-title {
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 4px;
+    }
+
+    .picker-sub {
+      color: var(--text-dim);
+      font-size: 12px;
+      margin-bottom: 24px;
+    }
 
     /* --- TEMPLATE CARDS --- */
     .template-card {
@@ -124,10 +144,15 @@
     }
 
     .template-icon {
-      width: 48px; height: 48px; border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
     /* --- CUSTOM TOOLS FLOATING PANEL --- */
@@ -141,279 +166,352 @@
       padding: 12px;
       border-radius: 14px;
       border: 1px solid var(--success-neon);
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
       z-index: 1000;
     }
 
 
 
     /* --- TOP BAR TITLES --- */
-.brand .title {
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  
-  /* The Gradient Magic */
-  background: linear-gradient(
-    to bottom,
-    #fff 20%, 
-    var(--electra-blue) 50%, 
-    #0891b2 80%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  
-  /* Subtle Outer Glow */
-  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.3));
-}
+    .brand .title {
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
 
-.plan-breadcrumb {
-    color: var(--text-dim); 
-    font-size: 14px; /* Slightly larger for readability */
-    margin-left: 15px; 
-    opacity: 0.7;
-}
+      /* The Gradient Magic */
+      background: linear-gradient(to bottom,
+          #fff 20%,
+          var(--electra-blue) 50%,
+          #0891b2 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
 
-/* --- THE TEMPLATE BADGE (MODE INSIGHTS) --- */
-#templateBadge {
-    padding: 8px 16px; 
-    border-radius: 8px; 
-    border: 1px solid var(--electra-blue); 
-    font-size: 12px; /* Better font size */
-    font-weight: 700; 
-    text-transform: uppercase; 
-    color: var(--electra-blue); 
-    background: rgba(34, 211, 238, 0.1);
-    min-width: 140px; /* Ensures it doesn't jump when text changes */
-    text-align: center;
-    box-shadow: 0 0 10px rgba(34, 211, 238, 0.1);
-}
+      /* Subtle Outer Glow */
+      filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.3));
+    }
 
-/* --- TEMPLATE LIST CONTAINER --- */
-.template-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-}
+    .plan-breadcrumb {
+      color: var(--text-dim);
+      font-size: 14px;
+      /* Slightly larger for readability */
+      margin-left: 15px;
+      opacity: 0.7;
+    }
 
-/* --- THE TEMPLATE CARD --- */
-.template-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px;
-  border-radius: 20px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
+    /* --- THE TEMPLATE BADGE (MODE INSIGHTS) --- */
+    #templateBadge {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--electra-blue);
+      font-size: 12px;
+      /* Better font size */
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--electra-blue);
+      background: rgba(34, 211, 238, 0.1);
+      min-width: 140px;
+      /* Ensures it doesn't jump when text changes */
+      text-align: center;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.1);
+    }
 
-/* Hover Effect: Glow and Slide */
-.template-card:hover {
-  background: rgba(34, 211, 238, 0.05);
-  border-color: var(--electra-blue);
-  transform: translateX(8px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-}
+    /* --- TEMPLATE LIST CONTAINER --- */
+    .template-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
 
-/* Active State: The "Selected" look */
-.template-card.active {
-  background: rgba(163, 230, 53, 0.08); /* Success Neon tint */
-  border-color: var(--success-neon);
-  box-shadow: 0 0 20px rgba(163, 230, 53, 0.15);
-}
+    /* --- THE TEMPLATE CARD --- */
+    .template-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 20px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
 
-/* Left Icon Container */
-.template-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  font-weight: 800;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--text-main);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
+    /* Hover Effect: Glow and Slide */
+    .template-card:hover {
+      background: rgba(34, 211, 238, 0.05);
+      border-color: var(--electra-blue);
+      transform: translateX(8px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
 
-/* Change icon color when card is active */
-.template-card.active .template-icon {
-  background: var(--success-neon);
-  color: #000;
-  border-color: var(--success-neon);
-}
+    /* Active State: The "Selected" look */
+    .template-card.active {
+      background: rgba(163, 230, 53, 0.08);
+      /* Success Neon tint */
+      border-color: var(--success-neon);
+      box-shadow: 0 0 20px rgba(163, 230, 53, 0.15);
+    }
 
-/* Text Content */
-.template-title {
-  font-weight: 700;
-  font-size: 15px;
-  color: #fff;
-  margin-bottom: 4px;
-}
+    /* Left Icon Container */
+    .template-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      transition: all 0.3s ease;
+      flex-shrink: 0;
+    }
 
-.template-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  line-height: 1.4;
-}
+    /* Change icon color when card is active */
+    .template-card.active .template-icon {
+      background: var(--success-neon);
+      color: #000;
+      border-color: var(--success-neon);
+    }
 
-/* Subtle pulse animation for the active card */
-.template-card.active::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
-  border-radius: 20px;
-  border: 2px solid var(--success-neon);
-  animation: card-pulse 2s infinite;
-  pointer-events: none;
-}
+    /* Text Content */
+    .template-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
 
-@keyframes card-pulse {
-  0% { transform: scale(1); opacity: 0.5; }
-  50% { transform: scale(1.02); opacity: 0; }
-  100% { transform: scale(1); opacity: 0.5; }
-}
+    .template-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    /* Subtle pulse animation for the active card */
+    .template-card.active::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border-radius: 20px;
+      border: 2px solid var(--success-neon);
+      animation: card-pulse 2s infinite;
+      pointer-events: none;
+    }
+
+    @keyframes card-pulse {
+      0% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+
+      50% {
+        transform: scale(1.02);
+        opacity: 0;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 0.5;
+      }
+    }
+
     .tool-item {
-      background: rgba(255,255,255,0.03);
+      background: rgba(255, 255, 255, 0.03);
       color: #fff;
       padding: 8px;
       margin-bottom: 6px;
       border-radius: 8px;
       cursor: grab;
       font-size: 11px;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid rgba(255, 255, 255, 0.05);
       transition: 0.2s;
     }
 
-    .tool-item:hover { border-color: var(--success-neon); background: rgba(163, 230, 53, 0.1); }
+    .tool-item:hover {
+      border-color: var(--success-neon);
+      background: rgba(163, 230, 53, 0.1);
+    }
 
     /* --- BUTTONS --- */
     .primary {
-      background: var(--success-neon); color: #000; border: none;
-      padding: 14px; border-radius: 12px; font-weight: 700; cursor: pointer; transition: 0.2s;
+      background: var(--success-neon);
+      color: #000;
+      border: none;
+      padding: 14px;
+      border-radius: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
     }
-    .primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(163, 230, 53, 0.4); }
+
+    .primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(163, 230, 53, 0.4);
+    }
 
     .secondary {
-      background: transparent; color: var(--text-dim);
-      border: 1px solid var(--glass-border); padding: 10px 20px;
-      border-radius: 10px; cursor: pointer; transition: 0.2s;
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--glass-border);
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.2s;
     }
-    .secondary:hover { border-color: #fff; color: #fff; }
 
-    .delete-btn { width: 100%; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px; font-size: 11px; border-radius: 8px; cursor: pointer; }
+    .secondary:hover {
+      border-color: #fff;
+      color: #fff;
+    }
+
+    .delete-btn {
+      width: 100%;
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px;
+      font-size: 11px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
     /* --- WALL ELEVATION MODAL --- */
     #elevationModal {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(2, 6, 23, 0.85);
-        backdrop-filter: blur(10px);
-        z-index: 9999;
-        align-items: center;
-        justify-content: center;
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
     }
-    #elevationModal.open { display: flex; }
+
+    #elevationModal.open {
+      display: flex;
+    }
 
     .elev-panel {
-        background: #0f172a;
-        border: 1px solid var(--electra-blue);
-        border-radius: 24px;
-        padding: 28px;
-        width: 80vw;
-        max-width: 860px;
-        box-shadow: 0 0 60px rgba(34,211,238,0.15);
-        animation: elevSlideIn 0.35s cubic-bezier(0.34,1.56,0.64,1);
+      background: #0f172a;
+      border: 1px solid var(--electra-blue);
+      border-radius: 24px;
+      padding: 28px;
+      width: 80vw;
+      max-width: 860px;
+      box-shadow: 0 0 60px rgba(34, 211, 238, 0.15);
+      animation: elevSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+
     @keyframes elevSlideIn {
-        from { transform: scale(0.85) translateY(30px); opacity: 0; }
-        to   { transform: scale(1)    translateY(0);    opacity: 1; }
+      from {
+        transform: scale(0.85) translateY(30px);
+        opacity: 0;
+      }
+
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
     }
+
     #elevationCanvas {
-        width: 100%;
-        border-radius: 14px;
-        background: #060d1a;
-        border: 1px solid rgba(34,211,238,0.1);
-        margin-top: 16px;
-        display: block;
+      width: 100%;
+      border-radius: 14px;
+      background: #060d1a;
+      border: 1px solid rgba(34, 211, 238, 0.1);
+      margin-top: 16px;
+      display: block;
     }
+
     .elev-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
+
     .elev-close {
-        background: rgba(239,68,68,0.1);
-        border: 1px solid rgba(239,68,68,0.4);
-        color: #ef4444;
-        padding: 6px 14px;
-        border-radius: 10px;
-        cursor: pointer;
-        font-weight: 700;
-        font-size: 13px;
-        transition: 0.2s;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444;
+      padding: 6px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 13px;
+      transition: 0.2s;
     }
-    .elev-close:hover { background: rgba(239,68,68,0.25); }
+
+    .elev-close:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
 
     /* Wall hover highlight cursor */
-    #previewCanvas.elevation-mode { cursor: crosshair; }
-
+    #previewCanvas.elevation-mode {
+      cursor: crosshair;
+    }
   </style>
 </head>
 
 <body>
 
-<header class="top-bar">
-  <div class="brand">
-    <div style="width:12px; height:12px; background:var(--electra-blue); border-radius:50%; box-shadow:0 0 12px var(--electra-blue);"></div>
-    <span class="title">Electra Plan</span>
-    <span style="color: var(--text-dim); font-size: 12px; margin-left: 15px; opacity: 0.6;">
-      / Intelligence / {{ plan_name }} (ID: {{ plan_id }})
-    </span>
-  </div>
-
-  <div class="actions">
-    <a href="/editor/{{ plan_id }}" style="text-decoration:none;">
-      <button class="secondary">Return to Editor</button>
-    </a>
-  </div>
-</header>
-
-<main class="app-container">
-  <section class="preview-section">
-    <div class="preview-header">
-        <div>
-            <div style="font-weight: 700; font-size: 16px;">Intelligence Preview</div>
-            <div style="color: var(--text-dim); font-size: 12px;">Real-time topology visualization.</div>
-        </div>
-        <div style="display: flex; gap: 12px; align-items: center;">
-            <button onclick="toggleNightMode()" id="nightModeBtn" style="background: rgba(30, 41, 59, 0.8); border: 1px solid #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
-                🌙 Simulate Lights 
-            </button>
-            <button onclick="toggleElevationMode()" id="elevBtn" style="background: rgba(30, 41, 59, 0.8); border: 1px solid #a78bfa; color: #a78bfa; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(167,139,250,0.2);">
-                🧱 Wall Elevation
-            </button>
-            <div id="templateBadge" style="padding:6px 16px; border-radius: 999px; border: 1px solid var(--glass-border); font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--electra-blue); background: rgba(34,211,238,0.1);">
-            </div>
-        </div>
+  <header class="top-bar">
+    <div class="brand">
+      <div
+        style="width:12px; height:12px; background:var(--electra-blue); border-radius:50%; box-shadow:0 0 12px var(--electra-blue);">
+      </div>
+      <span class="title">Electra Plan</span>
+      <span style="color: var(--text-dim); font-size: 12px; margin-left: 15px; opacity: 0.6;">
+        / Intelligence / {{ plan_name }} (ID: {{ plan_id }})
+      </span>
     </div>
 
-    <div id="customToolsPanel" style="display: none;">
+    <div class="actions">
+      <a href="/editor/{{ plan_id }}" style="text-decoration:none;">
+        <button class="secondary">Return to Editor</button>
+      </a>
+    </div>
+  </header>
+
+  <main class="app-container">
+    <section class="preview-section">
+      <div class="preview-header">
+        <div>
+          <div style="font-weight: 700; font-size: 16px;">Intelligence Preview</div>
+          <div style="color: var(--text-dim); font-size: 12px;">Real-time topology visualization.</div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <button onclick="toggleNightMode()" id="nightModeBtn"
+            style="background: rgba(30, 41, 59, 0.8); border: 1px solid #3b82f6; color: #fff; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);">
+            🌙 Simulate Lights
+          </button>
+          <button onclick="toggleElevationMode()" id="elevBtn"
+            style="background: rgba(30, 41, 59, 0.8); border: 1px solid #a78bfa; color: #a78bfa; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(167,139,250,0.2);">
+            🧱 Wall Elevation
+          </button>
+          <div id="templateBadge"
+            style="padding:6px 16px; border-radius: 999px; border: 1px solid var(--glass-border); font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--electra-blue); background: rgba(34,211,238,0.1);">
+          </div>
+        </div>
+      </div>
+
+      <div id="customToolsPanel" style="display: none;">
         <h3 style="color: var(--success-neon); font-size: 12px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">Kitchen Components</h3>
         
         <div class="tool-group">
             <p style="font-size: 9px; color: var(--text-dim); margin-bottom: 8px;">MANDATORY</p>
             <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_fan')">🌀 Ceiling Fan</div>
             <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_switch')">🎛️ Switch Board</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_light')">💡 Main Light</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_light_sink')">💡 Sink Light</div>
         </div>
         
         <div class="tool-group">
@@ -421,80 +519,88 @@
             <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_fridge')">🔌 Fridge Point</div>
             <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_mixi')">🔌 Mixi Point</div>
             <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_oven')">🔌 Oven Point</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_dishwasher')">🍽️ Dishwasher</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_ro')">🚰 Water Purifier</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_induction')">🍳 Induction/Hob</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_coffee')">☕ Coffee Maker</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_socket_general')">🔌 General Socket</div>
+            <div class="tool-item" draggable="true" ondragstart="handleDragStart(event, 'elec_exhaust')">💨 Exhaust Fan</div>
         </div>
 
         <button class="delete-btn" onclick="setActiveTool('delete')" style="margin-top: 20px;">❌ Remove Element</button>
-    </div>
+      </div>
 
-    <canvas id="previewCanvas"></canvas>
-  </section>
+      <canvas id="previewCanvas"></canvas>
+    </section>
 
-  <!-- WALL ELEVATION MODAL -->
-  <div id="elevationModal">
-    <div class="elev-panel">
-      <div class="elev-header">
-        <div>
-          <div style="font-weight: 800; font-size: 16px; color: #a78bfa;">🧱 Wall Elevation View</div>
-          <div id="elevWallLabel" style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Click a wall to inspect it</div>
+    <!-- WALL ELEVATION MODAL -->
+    <div id="elevationModal">
+      <div class="elev-panel">
+        <div class="elev-header">
+          <div>
+            <div style="font-weight: 800; font-size: 16px; color: #a78bfa;">🧱 Wall Elevation View</div>
+            <div id="elevWallLabel" style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Click a wall to
+              inspect it</div>
+          </div>
+          <button class="elev-close" onclick="closeElevation()">✕ Close</button>
         </div>
-        <button class="elev-close" onclick="closeElevation()">✕ Close</button>
-      </div>
-      <canvas id="elevationCanvas" height="320"></canvas>
-      <div style="display: flex; gap: 24px; margin-top: 14px; font-size: 11px; color: var(--text-dim);">
-        <span>🟡 Switch — 1.4m</span>
-        <span>🔵 Socket — 1.2m</span>
-        <span>💡 Light — Ceiling</span>
-        <span>🌀 Fan — Ceiling Centre</span>
-      </div>
-    </div>
-  </div>
-
-  <aside class="picker-panel">
-    <div class="picker-title">Auto-Layout Engine</div>
-    <div class="picker-sub">Select an electrical placement logic to apply to your plan.</div>
-
-    <div class="template-list">
-      <div class="template-card" onclick="selectTemplate('cost')" id="card-cost">
-        <div class="template-icon">₹</div>
-        <div>
-          <div class="template-title">Cost-Effective</div>
-          <div class="template-sub">Minimal nodes, optimized for budget.</div>
-        </div>
-      </div>
-
-      <div class="template-card" onclick="selectTemplate('custom')" id="card-custom">
-        <div class="template-icon">✎</div>
-        <div>
-          <div class="template-title">Custom Designer</div>
-          <div class="template-sub">Manual control over every point.</div>
-        </div>
-      </div>
-
-      <div class="template-card" onclick="selectTemplate('standard')" id="card-standard">
-        <div class="template-icon">⚡</div>
-        <div>
-          <div class="template-title">Standard Comfort</div>
-          <div class="template-sub">Balanced ergonomics and safety.</div>
+        <canvas id="elevationCanvas" height="320"></canvas>
+        <div style="display: flex; gap: 24px; margin-top: 14px; font-size: 11px; color: var(--text-dim);">
+          <span>🟡 Switch — 1.4m</span>
+          <span>🔵 Socket — 1.2m</span>
+          <span>💡 Light — Ceiling</span>
+          <span>🌀 Fan — Ceiling Centre</span>
         </div>
       </div>
     </div>
 
-    
+    <aside class="picker-panel">
+      <div class="picker-title">Auto-Layout Engine</div>
+      <div class="picker-sub">Select an electrical placement logic to apply to your plan.</div>
 
-    <div style="margin-top:auto; display:flex; gap: 12px; padding-top: 20px;">
-      <button class="secondary" style="flex:1;" onclick="previewOnly()">Update Preview</button>
-      <button class="primary" style="flex:1;" onclick="applySelectedTemplate()">Apply to Plan</button>
-    </div>
-  </aside>
-</main>
+      <div class="template-list">
+        <div class="template-card" onclick="selectTemplate('cost')" id="card-cost">
+          <div class="template-icon">₹</div>
+          <div>
+            <div class="template-title">Cost-Effective</div>
+            <div class="template-sub">Minimal nodes, optimized for budget.</div>
+          </div>
+        </div>
 
-<script>
-  window.PLAN_ID = parseInt("{{ plan_id }}", 10);
-</script>
+        <div class="template-card" onclick="selectTemplate('custom')" id="card-custom">
+          <div class="template-icon">✎</div>
+          <div>
+            <div class="template-title">Custom Designer</div>
+            <div class="template-sub">Manual control over every point.</div>
+          </div>
+        </div>
 
-<script src="/static/room_topology_engine.js"></script>
-<script src="/static/electrical_templates.js"></script>
-<script src="/static/custom_logic.js"></script>
+        <div class="template-card" onclick="selectTemplate('standard')" id="card-standard">
+          <div class="template-icon">⚡</div>
+          <div>
+            <div class="template-title">Standard Comfort</div>
+            <div class="template-sub">Balanced ergonomics and safety.</div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <div style="margin-top:auto; display:flex; gap: 12px; padding-top: 20px;">
+        <button class="secondary" style="flex:1;" onclick="previewOnly()">Update Preview</button>
+        <button class="primary" style="flex:1;" onclick="applySelectedTemplate()">Apply to Plan</button>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    window.PLAN_ID = parseInt("{{ plan_id }}", 10);
+  </script>
+
+  <script src="/static/room_topology_engine.js"></script>
+  <script src="/static/electrical_templates.js"></script>
+  <script src="/static/custom_logic.js"></script>
 
 </body>
+
 </html>

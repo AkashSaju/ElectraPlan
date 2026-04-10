@@ -3,6 +3,31 @@ const ctx = canvas.getContext("2d");
 let planObjects = [];
 
 // ============================
+// GLOBAL CONSTANTS & HELPERS
+// ============================
+const LOAD_SPECS = {
+    elec_fan: { watts: 75, amp: 0.3, icon: '🌀', label: 'Ceiling Fan' },
+    elec_light: { watts: 12, amp: 0.05, icon: '💡', label: 'LED Light' },
+    elec_light_sink: { watts: 15, amp: 0.06, icon: '💡', label: 'Sink Light' },
+    elec_socket_fridge: { watts: 500, amp: 2.2, icon: '❄️', label: 'Refrigerator' },
+    elec_socket_mixi: { watts: 750, amp: 3.3, icon: '🌪️', label: 'Mixer/Grinder' },
+    elec_socket_oven: { watts: 2000, amp: 8.7, icon: '🍳', label: 'Microwave Oven' },
+    elec_socket_water: { watts: 1500, amp: 6.5, icon: '🚿', label: 'Water Heater' },
+    elec_switch: { watts: 0, amp: 0.04, icon: '🔘', label: 'Switch' }
+};
+
+function getCircuitClass(p) {
+    const label = (p.label || "").toUpperCase();
+    const type = p.type || "";
+
+    if (label.includes("FRIDGE")) return { circuit: 'fridge', ...LOAD_SPECS.elec_socket_fridge };
+    if (label.includes("OVEN") || label.includes("MIXI")) return { circuit: 'cooking', ...LOAD_SPECS.elec_socket_oven };
+    if (label.includes("WATER") || label.includes("HEATER")) return { circuit: 'utility', ...LOAD_SPECS.elec_socket_water };
+    if (type.includes("fan")) return { circuit: 'vent', ...LOAD_SPECS.elec_fan };
+    return { circuit: 'lighting', ...LOAD_SPECS.elec_light };
+}
+
+// ============================
 // HEATMAP ENGINE
 // ============================
 window.isHeatmap = false;
@@ -16,7 +41,6 @@ function toggleHeatmap() {
         btn.style.background = '#f97316';
         btn.style.color = '#000';
         btn.innerHTML = '🔥 Heatmap ON';
-        // Update legend to show heatmap gradient scale
         if (legend) legend.innerHTML = `
             <div class="legend-item"><div class="line" style="background:#22d3ee;"></div> Lights (12W)</div>
             <div class="legend-item"><div class="line" style="background:#22c55e;"></div> Fans (75W)</div>
@@ -27,7 +51,6 @@ function toggleHeatmap() {
         btn.style.background = 'rgba(30,41,59,0.8)';
         btn.style.color = '#f97316';
         btn.innerHTML = '🔥 Heatmap OFF';
-        // Restore original legend
         if (legend) legend.innerHTML = `
             <div class="legend-item"><div class="line" style="background: #EF4444;"></div> Feed</div>
             <div class="legend-item"><div class="line" style="border: 1px dashed #EF4444;"></div> Load</div>
@@ -35,8 +58,42 @@ function toggleHeatmap() {
             <div class="legend-item"><div class="line" style="border: 1px dashed #FDE047;"></div> Drop</div>
         `;
     }
-    render(); // Force immediate full redraw with BOM
+    render();
 }
+
+// ============================
+// LIVE SIMULATION STATE
+// ============================
+window.isLiveMode = false;
+window.trippedCircuits = { lighting: false, vent: false, fridge: false, cooking: false, utility: false };
+
+function toggleLiveMode() {
+    window.isLiveMode = !window.isLiveMode;
+    const btn = document.getElementById('liveBtn');
+    if (window.isLiveMode) {
+       btn.style.background = '#ef4444';
+       btn.style.color = '#fff';
+       btn.innerHTML = '⚡ LIVE MODE ON';
+       // Reset all states when entering live mode for a clean sim
+       planObjects.forEach(o => { if (o.type && o.type.startsWith('elec_')) o.isPowered = false; });
+    } else {
+       btn.style.background = 'rgba(30,41,59,0.1)';
+       btn.style.color = '#ef4444';
+       btn.innerHTML = '🔴 LIVE MODE OFF';
+       window.trippedCircuits = { lighting: false, vent: false, fridge: false, cooking: false, utility: false };
+    }
+    render();
+}
+
+function resetAllTrips() {
+    window.trippedCircuits = { lighting: false, vent: false, fridge: false, cooking: false, utility: false };
+    const rBtn = document.getElementById('resetTripsBtn');
+    if (rBtn) { rBtn.style.opacity = '0'; rBtn.style.pointerEvents = 'none'; }
+    render();
+    if (document.getElementById('loadReportModal').classList.contains('open')) toggleLoadReport();
+}
+
+// Consolidated init moved to line 133
 
 /**
  * Converts a wattage value into a smooth heat color string.
@@ -72,23 +129,79 @@ async function init() {
     try {
         const res = await fetch(`/load-plan/${window.PLAN_ID}`);
         const data = await res.json();
-        planObjects = data.canvasObjects || [];
+        // Reliable fallback for different API response versions
+        planObjects = data.canvasObjects || data.objects || [];
         planName = data.name || "Kitchen Project";
 
-        // Display name in the UI for the report
         const titleEl = document.getElementById("planNameDisplay");
         if(titleEl) titleEl.innerText = planName;
 
         const urlParams = new URLSearchParams(window.location.search);
         selectedMode = urlParams.get('mode') || 'standard'; 
 
+        canvas.addEventListener('click', (e) => {
+            if (!window.isLiveMode) return;
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            planObjects.forEach(o => {
+                if (o.type && o.type.startsWith('elec_')) {
+                    const dist = Math.hypot(o.x - mx, o.y - my);
+                    if (dist < 22) { 
+                        o.isPowered = !o.isPowered;
+                        render();
+                        if (document.getElementById('loadReportModal').classList.contains('open')) toggleLoadReport();
+                    }
+                }
+            });
+        });
+
         resize();
-        render(); // Initial static render to populate BOM
-        animateWiring(); // Kick off 60fps flow animation
+        render(); 
+        animateWiring(); 
     } catch (err) {
         console.error("Failed to load plan:", err);
     }
 }
+
+// ============================
+// CAD SYMBOL RENDERERS
+// ============================
+function drawLightSymbol(x, y, active) {
+    ctx.shadowBlur = active ? 15 : 6;
+    ctx.shadowColor = active ? "#facc15" : "#eab308";
+    ctx.strokeStyle = active ? "#fff" : "#eab308";
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-8, y); ctx.lineTo(x+8, y); ctx.moveTo(x, y-8); ctx.lineTo(x, y+8); ctx.stroke();
+    ctx.shadowBlur = 0;
+}
+
+function drawFanSymbol(x, y, active) {
+    ctx.shadowBlur = active ? 15 : 6; ctx.shadowColor = "#3b82f6";
+    ctx.strokeStyle = active ? "#fff" : "#3b82f6"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y-8); ctx.moveTo(x, y); ctx.lineTo(x+7, y+4); ctx.moveTo(x, y); ctx.lineTo(x-7, y+4); ctx.stroke();
+    ctx.shadowBlur = 0;
+}
+
+function drawSocketSymbol(x, y, active) {
+    ctx.shadowBlur = active ? 15 : 6; ctx.shadowColor = "#a3e635";
+    ctx.strokeStyle = active ? "#fff" : "#a3e635"; ctx.lineWidth = 2;
+    ctx.strokeRect(x-10, y-10, 20, 20);
+    ctx.beginPath(); ctx.arc(x-4, y, 2, 0, Math.PI*2); ctx.arc(x+4, y, 2, 0, Math.PI*2); ctx.fillStyle = active ? "#fff" : "#a3e635"; ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+function drawSwitchSymbol(x, y, active) {
+    ctx.shadowBlur = active ? 15 : 6; ctx.shadowColor = "#22d3ee";
+    ctx.strokeStyle = active ? "#fff" : "#22d3ee"; ctx.lineWidth = 2;
+    ctx.strokeRect(x-10, y-6, 20, 12);
+    ctx.beginPath(); ctx.moveTo(x-6, y); ctx.lineTo(x+6, y); ctx.stroke();
+    ctx.shadowBlur = 0;
+}
+
 
 // Adjusted for better PDF contrast
 function drawLabel(text, x, y, color) {
@@ -117,7 +230,41 @@ function animateWiring() {
 /**
  * 2. MAIN RENDER LOOP
  */
+function checkCircuitSafety() {
+    if (!window.isLiveMode) return;
+
+    const points = planObjects.filter(o => String(o.type).startsWith("elec_"));
+    const circuits = { lighting: 0, vent: 0, fridge: 0, cooking: 0, utility: 0 };
+    
+    // Limits (Amps converted to Watts @ 230V)
+    const LIMITS = { lighting: 6, vent: 10, fridge: 16, cooking: 20, utility: 20 };
+
+    points.forEach(p => {
+        if (!p.isPowered) return;
+        const spec = getCircuitClass(p);
+        circuits[spec.circuit] += (LOAD_SPECS[p.type] || { watts: 60 }).watts;
+    });
+
+    let anyTripped = false;
+    Object.keys(circuits).forEach(cid => {
+        const liveAmps = circuits[cid] / 230;
+        if (liveAmps > LIMITS[cid]) {
+            window.trippedCircuits[cid] = true;
+            anyTripped = true;
+        }
+    });
+
+    const rBtn = document.getElementById('resetTripsBtn');
+    if (rBtn) {
+        if (anyTripped) {
+            rBtn.style.opacity = '1';
+            rBtn.style.pointerEvents = 'auto';
+        }
+    }
+}
+
 function render(skipBOM = false) {
+    checkCircuitSafety();
     drawGrid();
     drawArchitecture();
 
@@ -178,22 +325,47 @@ function render(skipBOM = false) {
  */
 function drawRoomWiring(points, walls, room) {
     const mb = points.find(p => p.type.includes('switch'));
-    
-    const fans = points.filter(p => p.type.includes('fan'));
+    const fns = points.filter(p => p.type.includes('fan'));
+    const lights = points.filter(p => p.type.includes('light'));
     const rCx = (room.x1 + room.x2) / 2;
     const rCy = (room.y1 + room.y2) / 2;
-    const fan = fans.length > 0 ? fans.reduce((closest, curr) => {
+    
+    // Fallback: if no fan, use a light as hub. If no light, use room center.
+    let hub = fns.length > 0 ? fns.reduce((closest, curr) => {
         const d1 = Math.hypot(closest.x - rCx, closest.y - rCy);
         const d2 = Math.hypot(curr.x - rCx, curr.y - rCy);
         return (d2 < d1) ? curr : closest;
-    }, fans[0]) : null;
+    }, fns[0]) : null;
+    
+    if (!hub && lights.length > 0) {
+         hub = lights[0];
+    }
+    
+    // If still no hub (no lights, no fans), fallback to a virtual point at room center for visualization
+    if (!hub) {
+         hub = { x: rCx, y: rCy, type: "virtual_hub", isPowered: false };
+    }
 
-    if (!mb || !fan) return;
+    if (!mb) {
+        // Render isolated points with an error state instead of hiding them completely
+        points.forEach(p => {
+            drawJunctionBox(p.x, p.y, "square");
+            if (p.type.includes('fan')) drawFanSymbol(p.x, p.y, false);
+            else if (p.type.includes('socket')) drawSocketSymbol(p.x, p.y, false);
+            else drawLightSymbol(p.x, p.y, false);
+            
+            const labelText = (p.label || p.type.replace('elec_', '')).toUpperCase();
+            drawLabel(labelText, p.x, p.y - 15, "rgba(239, 68, 68, 0.5)"); // Faded red text
+        });
+        
+        ctx.fillStyle = "rgba(239, 68, 68, 0.8)";
+        ctx.font = "bold 12px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("NO SWITCHBOARD", rCx, rCy);
+        return; // Skip wiring
+    }
 
-    // Look up wattage for any type
     const getWatts = (p) => (LOAD_SPECS[p.type] || { watts: 60 }).watts;
-
-    // MAIN FEED — total room load drives the feed wire intensity
     const roomTotalWatts = points.reduce((s, p) => s + getWatts(p), 0);
     const feedColor = window.isHeatmap ? heatmapColor(roomTotalWatts) : '#EF4444';
     const feedWidth = window.isHeatmap ? Math.min(2 + roomTotalWatts / 400, 7) : 4;
@@ -202,49 +374,62 @@ function drawRoomWiring(points, walls, room) {
         ctx.shadowColor = heatGlow(roomTotalWatts);
         ctx.shadowBlur = 12;
     }
-    renderProfessionalPath([{x: mb.x, y: mb.y}, {x: fan.x, y: fan.y}], feedColor, feedWidth, []);
+    renderProfessionalPath([{x: mb.x, y: mb.y}, {x: hub.x, y: hub.y}], feedColor, feedWidth, []);
     ctx.shadowBlur = 0;
 
-    drawJunctionBox(fan.x, fan.y, "circular");
-    drawLabel("MAIN FEED", (mb.x + fan.x) / 2, (mb.y + fan.y) / 2 - 10, feedColor);
-
-    let fanOutletsUsed = 1;
+    drawJunctionBox(hub.x, hub.y, "circular");
+    drawLabel("MAIN FEED", (mb.x + hub.x) / 2, (mb.y + hub.y) / 2 - 10, feedColor);
 
     points.forEach(p => {
-        if (p === mb || p === fan) return;
-        const labelText = (p.label || p.type.replace('elec_', '')).toUpperCase();
+        if (p === mb || p === hub) return;
+        
         const watts = getWatts(p);
+        const labelText = (p.label || p.type.replace('elec_', '')).toUpperCase();
+        
+        // Decide route (Heavy loads go direct to MB, lights/fans go to Fan Hub)
+        const isHeavy = labelText.includes("FRIDGE") || labelText.includes("OVEN") || labelText.includes("WATER") || watts >= 1000;
+        const path = calculateRealWorldPath(isHeavy ? mb : hub, p, walls, room);
+        
+        let lineColor = isHeavy ? "#EF4444" : "#FACC15";
+        let lineWidth = isHeavy ? 2.5 : 1.5;
+        let lineDash = isHeavy ? [] : [10, 5];
 
-        if (labelText.includes("FRIDGE")) {
-            const path = calculateRealWorldPath(mb, p, walls, room);
-            const lineColor = window.isHeatmap ? heatmapColor(watts) : '#EF4444';
+        if (window.isHeatmap) {
+            lineColor = heatmapColor(watts);
+            lineWidth = Math.min(2 + watts / 400, 6);
+            ctx.shadowColor = heatGlow(watts);
+            ctx.shadowBlur = 8;
+        }
 
-            if (window.isHeatmap) { ctx.shadowColor = heatGlow(watts); ctx.shadowBlur = 10; }
-            renderProfessionalPath(path, lineColor, window.isHeatmap ? Math.min(2 + watts / 300, 6) : 3, [5, 5]);
-            ctx.shadowBlur = 0;
-            drawLabel("FRIDGE", p.x, p.y - 15, lineColor);
-
-        } else {
-            if (fanOutletsUsed >= 4) {
-                drawLabel("ADDL J-BOX REQ", fan.x, fan.y + 20, "#94a3b8");
-            }
-
-            const path = calculateRealWorldPath(fan, p, walls, room);
-            const isOven = labelText.includes("OVEN");
-            const lineColor = window.isHeatmap ? heatmapColor(watts)
-                                : (isOven ? "#EF4444" : "#FACC15");
-            const lineWidth = window.isHeatmap ? Math.min(1.5 + watts / 400, 5)
-                                : (isOven ? 3 : 2);
-            const lineDash = isOven && !window.isHeatmap ? [8, 4] : [];
-
-            if (window.isHeatmap) { ctx.shadowColor = heatGlow(watts); ctx.shadowBlur = 8; }
-            renderProfessionalPath(path, lineColor, lineWidth, lineDash);
+        if (path && path.length > 1) {
+            renderProfessionalPath(path, lineColor, lineWidth, lineDash, p);
             ctx.shadowBlur = 0;
             drawLabel(labelText, p.x, p.y - 15, lineColor);
-
-            fanOutletsUsed++;
         }
+
+        // Live Power Indicator Ring
+        if (window.isLiveMode && p.isPowered) {
+            const spec = getCircuitClass(p);
+            const isTripped = window.trippedCircuits[spec.circuit];
+            if (!isTripped) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 16 + Math.sin(Date.now()/150)*4, 0, Math.PI*2);
+                ctx.strokeStyle = lineColor;
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
         drawJunctionBox(p.x, p.y, "square");
+
+        // DRAW CAD SYMBOL
+        const isPowered = p.isPowered && !window.trippedCircuits[getCircuitClass(p).circuit];
+        if (p.type.includes('fan')) drawFanSymbol(p.x, p.y, isPowered);
+        else if (p.type.includes('switch')) drawSwitchSymbol(p.x, p.y, isPowered);
+        else if (p.type.includes('socket')) drawSocketSymbol(p.x, p.y, isPowered);
+        else drawLightSymbol(p.x, p.y, isPowered);
     });
 }
 
@@ -305,13 +490,42 @@ function drawDimensionAnnotation(path) {
     ctx.fillText(label, lx, ly + 3);
 }
 
-function renderProfessionalPath(path, color, width, dash) {
+function renderProfessionalPath(path, color, width, dash, p = null) {
+    let finalColor = color;
+    let finalWidth = width;
+    let finalDash = dash && dash.length > 0 ? dash : [10, 5];
+    let speedMult = 1.0;
+
+    // LIVE SIMULATION LOGIC
+    if (window.isLiveMode && p) {
+        const spec = getCircuitClass(p);
+        const circuitId = spec.circuit;
+        
+        if (window.trippedCircuits[circuitId]) {
+            // Circuit is tripped - dark & static
+            finalColor = "rgba(51, 65, 85, 0.4)";
+            finalWidth = width * 0.8;
+            speedMult = 0;
+        } else if (p.isPowered) {
+            // Appliance is powered - glowing & fast
+            finalColor = color;
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 12;
+            speedMult = 4.5; // High-speed pulse
+            finalWidth = width * 1.5;
+        } else {
+            // Live mode but not turned on
+            finalColor = "rgba(255,255,255,0.15)";
+            speedMult = 0.2; // Slow idle pulse
+        }
+    }
+
     ctx.beginPath();
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
+    ctx.strokeStyle = finalColor;
+    ctx.lineWidth = finalWidth;
     
-    ctx.setLineDash(dash && dash.length > 0 ? dash : [10, 5]);
-    ctx.lineDashOffset = liveWireOffset;
+    ctx.setLineDash(finalDash);
+    ctx.lineDashOffset = liveWireOffset * speedMult;
 
     ctx.moveTo(path[0].x, path[0].y);
     for (let i = 1; i < path.length; i++) {
@@ -320,8 +534,8 @@ function renderProfessionalPath(path, color, width, dash) {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
+    ctx.shadowBlur = 0;
 
-    // Draw dimension annotation on top of the wire
     drawDimensionAnnotation(path);
 }
 
@@ -372,19 +586,7 @@ function calculateRealWorldPath(start, end, walls, room) {
 }
 
 
-/**
- * 7. LOAD CALCULATION ENGINE
- * Defines standard wattage for Kerala-standard residential fittings
- */
-const LOAD_SPECS = {
-    elec_fan: { watts: 75, amp: 0.3 },
-    elec_switch: { watts: 10, amp: 0.04 }, // Idle/indicator
-    elec_socket_fridge: { watts: 500, amp: 2.2 },
-    elec_socket_mixi: { watts: 750, amp: 3.3 },
-    elec_socket_oven: { watts: 2000, amp: 8.7 },
-    elec_socket_water: { watts: 1500, amp: 6.5 },
-    elec_light: { watts: 12, amp: 0.05 }
-};
+// Using Global LOAD_SPECS
 
 function calculateTotalLoad(points) {
     let totalWatts = 0;
@@ -423,13 +625,13 @@ function calculateTotalLoad(points) {
 function updateBOM(points, topology, mode = 'cost') {
     let conduitMtrs = 0;
     const mb = points.find(p => p.type.includes('switch'));
-    const globalFan = points.find(p => p.type.includes('fan'));
-    if (!mb || !globalFan) return;
+    // Removed strict early return. We still process BOM even if no switch is found yet
 
     // --- 1. LOAD CALCULATION SPECS ---
     const loadSpecs = {
         elec_fan: 75,
         elec_light: 12,
+        elec_light_sink: 15,
         elec_socket_fridge: 500,
         elec_socket_mixi: 750,
         elec_socket_oven: 2000,
@@ -473,30 +675,43 @@ function updateBOM(points, topology, mode = 'cost') {
         if (p === roomMB) return; 
 
         const roomFans = points.filter(f => f.type.includes('fan') && isInside(f.x, f.y, roomT.room));
+        const roomLights = points.filter(l => l.type.includes('light') && isInside(l.x, l.y, roomT.room));
         const rCx = (roomT.room.x1 + roomT.room.x2) / 2;
         const rCy = (roomT.room.y1 + roomT.room.y2) / 2;
-        const roomFan = roomFans.length > 0 ? roomFans.reduce((closest, curr) => {
+        
+        let roomHub = roomFans.length > 0 ? roomFans.reduce((closest, curr) => {
             const d1 = Math.hypot(closest.x - rCx, closest.y - rCy);
             const d2 = Math.hypot(curr.x - rCx, curr.y - rCy);
             return (d2 < d1) ? curr : closest;
-        }, roomFans[0]) : globalFan;
+        }, roomFans[0]) : null;
+        
+        if (!roomHub && roomLights.length > 0) roomHub = roomLights[0];
+        if (!roomHub) roomHub = { x: rCx, y: rCy }; // Virtual point
 
         let pathDist = 0;
         
         if (labelText.includes("FRIDGE") || labelText.includes("OVEN") || labelText.includes("WATER") || watts >= 1000) {
             // Heavy Loads route DIRECTLY to the Main Board
-            const path = calculateRealWorldPath(roomMB, p, roomT.walls, roomT.room);
-            pathDist = (getPathDist(path) * 0.05) + 1.8;
+            if (roomMB) {
+                const path = calculateRealWorldPath(roomMB, p, roomT.walls, roomT.room);
+                pathDist = (getPathDist(path) * 0.05) + 1.8;
+            } else {
+                pathDist = 4.5; // Safe fallback estimation
+            }
             conduitMtrs += pathDist;
             highLoadDetected = true;
             highLoadConduitMtrs += pathDist; 
         }
-        else if (isPointOnSameWall(p, roomMB, roomT.walls) && p.type.includes('light')) {
+        else if (roomMB && isPointOnSameWall(p, roomMB, roomT.walls) && p.type.includes('light')) {
             conduitMtrs += 1.2;
         } else if (p.type.includes('fan')) {
-            conduitMtrs += (Math.hypot(roomFan.x - roomMB.x, roomFan.y - roomMB.y) * 0.05);
+            if (roomMB) {
+                conduitMtrs += (Math.hypot(roomHub.x - roomMB.x, roomHub.y - roomMB.y) * 0.05);
+            } else {
+                conduitMtrs += 3.0; // Safe fallback estimation
+            }
         } else {
-            const path = calculateRealWorldPath(roomFan, p, roomT.walls, roomT.room);
+            const path = calculateRealWorldPath(roomHub, p, roomT.walls, roomT.room);
             conduitMtrs += (getPathDist(path) * 0.05) + 2.0;
         }
     });
@@ -604,8 +819,9 @@ function findSharedCorner(w1, w2) {
 }
 
 function isInside(x, y, r) {
-    return x >= Math.min(r.x1, r.x2) && x <= Math.max(r.x1, r.x2) &&
-           y >= Math.min(r.y1, r.y2) && y <= Math.max(r.y1, r.y2);
+    const pad = 25; // Tolerance to catch wall-mounted items pushed slightly outside bounding box
+    return x >= Math.min(r.x1, r.x2) - pad && x <= Math.max(r.x1, r.x2) + pad &&
+           y >= Math.min(r.y1, r.y2) - pad && y <= Math.max(r.y1, r.y2) + pad;
 }
 
 function drawGrid() {
@@ -739,7 +955,13 @@ function toggleLoadReport() {
         const watts = (LOAD_SPECS[p.type] || { watts: 60 }).watts;
         // Use the resolved label if meaningful, otherwise fall back to the stored p.label
         const displayLabel = (p.label && p.label.length > 1) ? p.label : spec.label;
-        const entry = { label: displayLabel, icon: spec.icon, watts, amps: (watts/230).toFixed(2) };
+        const entry = { 
+            label: displayLabel, 
+            icon: spec.icon, 
+            watts, 
+            amps: (watts/230).toFixed(2),
+            isPowered: !!p.isPowered 
+        };
         (circuits[spec.circuit] || circuits.lighting).push(entry);
     });
 
@@ -768,23 +990,35 @@ function toggleLoadReport() {
 
     circuitDef.forEach(({ id, gaugeId, color }) => {
         const items  = circuits[id];
-        const totalW = items.reduce((s, e) => s + e.watts, 0);
-        const totalA = totalW / 230;
-        const mcb    = pickMCB(totalA);
+        const designW = items.reduce((s, e) => s + e.watts, 0);
+        const liveW   = items.filter(e => e.isPowered).reduce((s, e) => s + e.watts, 0);
+        const totalA  = designW / 230;
+        const liveA   = liveW / 230;
+        const mcb     = pickMCB(totalA);
+        const isTripped = window.trippedCircuits[id];
 
-        drawGauge(gaugeId, totalW / maxW, color);
+        drawGauge(gaugeId, isTripped ? 1.0 : (designW / maxW), isTripped ? '#ef4444' : color);
 
-        set(`stat-${id}`, `${totalW}W`);
-        set(`amp-${id}`,  `${totalA.toFixed(1)} A`);
-        set(`mcb-${id}`,  `<span style="background:${mcb.color}22; border:1px solid ${mcb.color}; color:${mcb.color}; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700;">MCB: ${mcb.rating}</span>`);
+        const statLabel = window.isLiveMode ? `Live: ${liveW}W / Design: ${designW}W` : `${designW}W`;
+        const ampLabel  = window.isLiveMode ? `Live: ${liveA.toFixed(1)}A / ${mcb.rating}` : `${totalA.toFixed(1)} A`;
+        
+        set(`stat-${id}`, isTripped ? '<span style="color:#ef4444; font-weight:900;">TRIPPED!</span>' : statLabel);
+        set(`amp-${id}`,  ampLabel);
+        
+        const mcbStyle = isTripped ? `background:#ef4444; color:#fff; border:none;` : `background:${mcb.color}22; border:1px solid ${mcb.color}; color:${mcb.color};`;
+        set(`mcb-${id}`,  `<span style="${mcbStyle} padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700;">MCB: ${mcb.rating}</span>`);
 
         // Itemized appliance breakdown
         const listHTML = items.length > 0
-            ? items.map(e => `
-                <div class="item-row">
-                    <span class="item-name">${e.icon} ${e.label}</span>
-                    <span class="item-w" style="color:${color};">${e.watts}W / ${e.amps}A</span>
-                </div>`).join('')
+            ? items.map(e => {
+                const powered = e.isPowered ? 'opacity:1; color:'+color : 'opacity:0.4;';
+                const pDot = e.isPowered ? `<span style="background:${color}; width:6px; height:6px; border-radius:50%; display:inline-block; margin-right:5px; box-shadow:0 0 5px ${color};"></span>` : '';
+                return `
+                <div class="item-row" style="${powered}">
+                    <span class="item-name">${pDot}${e.icon} ${e.label}</span>
+                    <span class="item-w">${e.watts}W / ${e.amps}A</span>
+                </div>`;
+            }).join('')
             : `<div class="item-row" style="color:#334155; font-style:italic; justify-content:center;">No loads on this circuit</div>`;
 
         set(`items-${id}`, listHTML);
